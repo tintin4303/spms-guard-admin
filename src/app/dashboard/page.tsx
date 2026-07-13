@@ -45,8 +45,8 @@ const incidents = [
 
 const severityConfig = {
   critical: { badge: "bg-red-100 text-red-700 border-red-200", icon: "text-red-500", bg: "bg-red-50 border-red-200" },
-  high:     { badge: "bg-orange-100 text-orange-700 border-orange-200", icon: "text-orange-500", bg: "bg-orange-50 border-orange-200" },
-  medium:   { badge: "bg-amber-100 text-amber-700 border-amber-200", icon: "text-amber-500", bg: "bg-amber-50 border-amber-200" },
+  high: { badge: "bg-orange-100 text-orange-700 border-orange-200", icon: "text-orange-500", bg: "bg-orange-50 border-orange-200" },
+  medium: { badge: "bg-amber-100 text-amber-700 border-amber-200", icon: "text-amber-500", bg: "bg-amber-50 border-amber-200" },
 };
 
 export default function DashboardOverview() {
