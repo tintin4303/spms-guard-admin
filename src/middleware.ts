@@ -8,6 +8,10 @@ export default auth((req) => {
 
   if (isOnLoginPage) {
     if (isLoggedIn) {
+      const role = String((req.auth?.user as any)?.role || '').toLowerCase();
+      if (role.includes('admin')) {
+        return Response.redirect(new URL('/dashboard/users', req.nextUrl))
+      }
       return Response.redirect(new URL('/dashboard', req.nextUrl))
     }
     return

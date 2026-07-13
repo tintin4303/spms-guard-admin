@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { logOut } from './actions';
+import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard,
   FileText,
@@ -81,16 +81,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
         <div className="px-3 pb-4">
-          <form action={logOut}>
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150"
-              style={{ backgroundColor: "rgba(110,172,218,0.08)", color: palette.cream, border: `1px solid rgba(110,172,218,0.15)` }}
-            >
-              <LogOut className="w-4 h-4" style={{ color: palette.sky }} />
-              Logout
-            </button>
-          </form>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            type="button"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150"
+            style={{ backgroundColor: "rgba(110,172,218,0.08)", color: palette.cream, border: `1px solid rgba(110,172,218,0.15)` }}
+          >
+            <LogOut className="w-4 h-4" style={{ color: palette.sky }} />
+            Logout
+          </button>
         </div>
       </aside>
       <div className="flex-1 flex flex-col overflow-hidden">
