@@ -1,109 +1,130 @@
 "use client";
-
-import Link from "next/link";
-import { ReactNode } from "react";
-import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
-  CalendarCheck, 
-  Map, 
-  ListOrdered, 
-  BarChart3, 
-  Settings, 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { logOut } from './actions';
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  CalendarDays,
+  Map,
+  BookOpen,
+  BarChart2,
+  Settings,
   LogOut,
-  Bell
-} from "lucide-react";
+  Bell,
+} from 'lucide-react';
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+const palette = {
+  navy: '#021526',
+  midBlue: '#03346E',
+  sky: '#6EACDA',
+  cream: '#E2E2B6',
+};
+
+const navItems = [
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
+  { href: '/dashboard/contracts', icon: FileText, label: 'Contracts' },
+  { href: '/dashboard/guards', icon: Users, label: 'Guard Management' },
+  { href: '/dashboard/schedules', icon: CalendarDays, label: 'Assign Schedule' },
+  { href: '/map', icon: Map, label: 'Map & Path Creation' },
+  { href: '/dashboard/logs', icon: BookOpen, label: 'Operation Log' },
+  { href: '/dashboard/reports', icon: BarChart2, label: 'System Report' },
+  { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
+];
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const navItems = [
-    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Contracts", href: "/dashboard/contracts", icon: FileText },
-    { name: "Guard Management", href: "/dashboard/guards", icon: Users },
-    { name: "Assign Schedule", href: "/dashboard/schedules", icon: CalendarCheck },
-    { name: "Map & Path Creation", href: "/map", icon: Map },
-    { name: "Operation Log", href: "/dashboard/logs", icon: ListOrdered },
-    { name: "System Report", href: "/dashboard/reports", icon: BarChart3 },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
-  ];
-
   return (
-    <div className="flex h-screen bg-gray-50 flex-col md:flex-row font-sans">
-      
-      {/* Sidebar Navigation */}
-      <aside className="w-full md:w-72 bg-[#0f172a] text-white flex flex-col shadow-2xl h-auto md:h-full flex-shrink-0">
-        <div className="p-6 border-b border-gray-700/50 flex flex-col gap-1 text-center md:text-left">
-          <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+    <div className="flex h-screen w-full overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif", backgroundColor: "#f0f4f8" }}>
+      <aside className="w-60 flex-shrink-0 flex flex-col h-full" style={{ backgroundColor: palette.navy }}>
+        <div className="px-5 pt-6 pb-5" style={{ borderBottom: `1px solid rgba(110,172,218,0.15)` }}>
+          <h1 className="text-xl font-bold leading-tight tracking-tight" style={{ color: palette.sky, fontFamily: "'Outfit', sans-serif" }}>
             SPMS Command
           </h1>
-          <p className="text-xs text-gray-400 font-medium tracking-wide uppercase">Manager Portal</p>
+          <p className="text-[10px] font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: palette.cream, opacity: 0.65 }}>
+            Manager Portal
+          </p>
         </div>
-
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {navItems.map(({ icon: Icon, label, href }) => {
+            const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
             return (
-              <Link 
-                key={item.name} 
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group relative overflow-hidden
-                  ${isActive 
-                    ? "bg-blue-600 shadow-md text-white shadow-blue-500/20" 
-                    : "text-gray-300 hover:bg-slate-800 hover:text-white"
-                  }
-                `}
+              <Link
+                key={label}
+                href={href}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 text-left"
+                style={
+                  isActive
+                    ? { backgroundColor: palette.midBlue, color: "#ffffff" }
+                    : { color: palette.cream, backgroundColor: "transparent" }
+                }
               >
-                <Icon className={`w-5 h-5 transition-transform ${!isActive && "group-hover:scale-110 group-hover:text-blue-400"}`} />
-                <span className="font-semibold text-sm tracking-wide">{item.name}</span>
+                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: isActive ? "#ffffff" : palette.sky, opacity: isActive ? 1 : 0.75 }} />
+                <span>{label}</span>
               </Link>
-            )
+            );
           })}
         </nav>
-
-        <div className="p-6 border-t border-gray-700/50 mt-auto space-y-4">
-          <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm shadow-inner shadow-blue-400/50">
+        <div className="mx-3 mb-3 rounded-xl p-3" style={{ backgroundColor: "rgba(3,52,110,0.5)", border: `1px solid rgba(110,172,218,0.15)` }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[13px] font-bold flex-shrink-0" style={{ backgroundColor: palette.midBlue, border: `2px solid ${palette.sky}` }}>
               AD
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-white">Admin User</span>
-              <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Online</span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-white leading-none">Admin User</p>
+              <p className="text-[11px] font-semibold mt-1 leading-none uppercase tracking-wide" style={{ color: "#4ade80" }}>
+                ● Online
+              </p>
             </div>
           </div>
-          
-          <button className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-slate-800 border border-slate-700/50 text-sm font-semibold hover:bg-red-500 hover:text-white text-gray-300 transition-all group shadow-sm">
-            <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Logout
-          </button>
+        </div>
+        <div className="px-3 pb-4">
+          <form action={logOut}>
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150"
+              style={{ backgroundColor: "rgba(110,172,218,0.08)", color: palette.cream, border: `1px solid rgba(110,172,218,0.15)` }}
+            >
+              <LogOut className="w-4 h-4" style={{ color: palette.sky }} />
+              Logout
+            </button>
+          </form>
         </div>
       </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        
-        {/* Top Header */}
-        <header className="h-16 lg:h-20 bg-white/95 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 lg:px-8 shadow-sm flex-shrink-0 z-10 sticky top-0">
-          <h2 className="text-lg lg:text-xl font-bold text-gray-800 tracking-tight">Dashboard Overview</h2>
-          <div className="flex items-center gap-4">
-            <button className="relative p-2 text-gray-400 hover:text-blue-500 transition-colors rounded-full hover:bg-gray-100">
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              <Bell className="w-5 h-5" />
-            </button>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-14 flex items-center px-6 gap-4 flex-shrink-0" style={{ backgroundColor: palette.midBlue, borderBottom: `1px solid rgba(110,172,218,0.2)` }}>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[15px] font-bold text-white leading-none tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              System Overview
+            </h2>
+            <p className="text-[11px] mt-0.5 leading-none" style={{ color: palette.sky, opacity: 0.75 }}>
+              Sunday, July 13, 2026
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(110,172,218,0.15)", color: palette.sky, border: `1px solid rgba(110,172,218,0.3)` }}>
+            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+            All Systems Normal
+          </div>
+          <button className="relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors" style={{ backgroundColor: "rgba(110,172,218,0.1)" }}>
+            <Bell className="w-4 h-4" style={{ color: palette.cream }} />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2" style={{ borderColor: palette.midBlue }} />
+          </button>
+          <div className="flex items-center gap-2.5 pl-3" style={{ borderLeft: `1px solid rgba(110,172,218,0.25)` }}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold" style={{ background: `linear-gradient(135deg, ${palette.sky}, ${palette.midBlue})` }}>
+              AD
+            </div>
+            <div className="hidden md:block">
+              <p className="text-[12px] font-semibold text-white leading-none">Admin</p>
+              <p className="text-[10px] mt-0.5 leading-none" style={{ color: palette.cream, opacity: 0.65 }}>Super Admin</p>
+            </div>
           </div>
         </header>
-
-        {/* Scrollable Page Content */}
-        <div className="flex-1 overflow-auto p-6 lg:p-8 relative">
-          <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] pointer-events-none -z-10" />
+        <main className="flex-1 overflow-y-auto p-5 space-y-4" style={{ backgroundColor: "#eef2f7" }}>
           {children}
-        </div>
-      
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
