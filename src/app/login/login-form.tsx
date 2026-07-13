@@ -20,7 +20,7 @@ export function LoginForm() {
           Sign In
         </CardTitle>
         <CardDescription className="text-white/70">
-          Enter your email and password to access the command center.
+          Enter your email and password.
         </CardDescription>
       </CardHeader>
       <form action={formAction}>
@@ -45,7 +45,7 @@ export function LoginForm() {
               className="bg-white/20 border-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/30"
             />
           </div>
-          
+
           {errorMessage && (
             <div className="text-sm text-red-300 font-medium bg-red-950/50 p-2 rounded-md border border-red-500/30">
               {errorMessage}
@@ -53,9 +53,9 @@ export function LoginForm() {
           )}
         </CardContent>
         <CardFooter className="mt-6">
-          <Button 
-            className="w-full bg-white text-black hover:bg-gray-200 transition-colors" 
-            type="submit" 
+          <Button
+            className="w-full bg-white text-black hover:bg-gray-200 transition-colors"
+            type="submit"
             disabled={isPending}
           >
             {isPending ? "Authenticating..." : "Sign in"}

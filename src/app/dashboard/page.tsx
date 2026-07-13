@@ -16,7 +16,8 @@ export default async function DashboardPage() {
         <div className="space-y-4">
           <div className="p-4 bg-black/40 rounded-lg border border-white/5">
             <p className="text-sm text-zinc-500">Role</p>
-            <p className="font-mono">{session?.user?.role || "N/A"}</p>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <p className="font-mono">{((session?.user as any)?.role) || "N/A"}</p>
           </div>
           
           <form action={logOut}>
