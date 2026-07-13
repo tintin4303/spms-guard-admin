@@ -1,8 +1,10 @@
 import { auth } from "@/auth"
+import { canManageUsers } from "@/lib/permissions"
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
   const isOnLoginPage = req.nextUrl.pathname.startsWith('/login')
+  const isOnUsersPage = req.nextUrl.pathname.startsWith('/dashboard/users')
 
   if (isOnLoginPage) {
     if (isLoggedIn) {
@@ -13,6 +15,14 @@ export default auth((req) => {
 
   if (!isLoggedIn) {
     return Response.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // RBAC Enforcement
+  if (isOnUsersPage) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!canManageUsers((req.auth?.user as any)?.role)) {
+      return Response.redirect(new URL('/dashboard', req.nextUrl))
+    }
   }
 })
 

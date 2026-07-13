@@ -3,7 +3,6 @@ import { LoginForm } from "@/app/login/login-form"
 export default function LoginPage() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 relative overflow-hidden">
-      {/* Stunning gradient mesh background elements */}
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/30 rounded-full blur-[120px] mix-blend-screen" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-violet-600/30 rounded-full blur-[150px] mix-blend-screen" />
       <div className="absolute top-[20%] right-[10%] w-[400px] h-[400px] bg-fuchsia-600/20 rounded-full blur-[100px] mix-blend-screen" />
