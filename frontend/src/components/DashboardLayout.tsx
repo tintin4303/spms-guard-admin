@@ -10,22 +10,26 @@ import {
   Settings,
   LogOut,
   Bell,
+  ShieldAlert,
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
-  { href: '/dashboard/contracts', icon: FileText, label: 'Contracts' },
-  { href: '/dashboard/guards', icon: Users, label: 'Guards' },
-  { href: '/dashboard/schedules', icon: CalendarDays, label: 'Schedules' },
-  { href: '/map', icon: Map, label: 'Map Control' },
-  { href: '/dashboard/logs', icon: BookOpen, label: 'Log' },
-  { href: '/dashboard/reports', icon: BarChart2, label: 'Reports' },
-  { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Overview', roles: ['OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
+  { href: '/dashboard/users', icon: Users, label: 'User Management', roles: ['ADMIN'] },
+  { href: '/dashboard/contracts', icon: FileText, label: 'Contracts', roles: ['OPERATION_MANAGER', 'CLIENT'] },
+  { href: '/map', icon: Map, label: 'Map Control', roles: ['OPERATION_MANAGER', 'CLIENT'] },
+  { href: '/dashboard/guards', icon: Users, label: 'Guards', roles: ['OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
+  { href: '/dashboard/schedules', icon: CalendarDays, label: 'Schedules', roles: ['OPERATION_MANAGER', 'AGENCY_MANAGER'] },
+  { href: '/dashboard/logs', icon: BookOpen, label: 'Log', roles: ['OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
+  { href: '/dashboard/reports', icon: BarChart2, label: 'Reports', roles: ['OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
+  { href: '/dashboard/settings', icon: Settings, label: 'Settings', roles: ['ADMIN', 'OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
 ];
 
-export default function DashboardLayout() {
+export default function DashboardLayout({ user, onLogout }: { user: any, onLogout: () => void }) {
   const location = useLocation();
   const pathname = location.pathname;
+
+  const allowedNav = navItems.filter(item => item.roles.includes(user?.role || 'CLIENT'));
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#F8FAFC]">
@@ -41,7 +45,7 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-          {navItems.map(({ icon: Icon, label, href }) => {
+          {allowedNav.map(({ icon: Icon, label, href }) => {
             const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
             return (
               <Link
@@ -62,7 +66,7 @@ export default function DashboardLayout() {
 
         <div className="px-3 pb-4">
           <button
-            onClick={() => alert("Logout")}
+            onClick={onLogout}
             type="button"
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded text-[13px] font-medium transition-colors bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
           >
@@ -88,12 +92,12 @@ export default function DashboardLayout() {
             <Bell className="w-4 h-4 text-[#6B7280]" />
           </button>
           <div className="flex items-center gap-2.5 pl-4 ml-2 border-l border-[#E2E8F0]">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold bg-[#2563EB]">
-              AD
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold bg-[#1E3A5F]">
+              <ShieldAlert className="w-4 h-4" />
             </div>
             <div className="hidden md:block">
-              <p className="text-[13px] font-semibold text-[#1E3A5F] leading-none">Admin User</p>
-              <p className="text-[11px] mt-1 leading-none text-[#6B7280]">System Administrator</p>
+              <p className="text-[13px] font-semibold text-[#1E3A5F] leading-none">{user?.name || 'User'}</p>
+              <p className="text-[11px] mt-1 leading-none text-[#6B7280]">{user?.role || 'Guest'}</p>
             </div>
           </div>
         </header>

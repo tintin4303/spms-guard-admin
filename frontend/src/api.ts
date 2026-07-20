@@ -1,5 +1,29 @@
 const API_BASE_URL = 'http://localhost:3001/api';
 
+export const fetchUsers = async () => {
+  const response = await fetch(`${API_BASE_URL}/users`);
+  if (!response.ok) throw new Error('Failed to fetch users');
+  return response.json();
+};
+
+export const createUser = async (data: any) => {
+  const response = await fetch(`${API_BASE_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to create user');
+  return response.json();
+};
+
+export const deleteUser = async (id: string) => {
+  const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete user');
+  return response.json();
+};
+
 export const fetchGuards = async () => {
   const response = await fetch(`${API_BASE_URL}/guards`);
   if (!response.ok) throw new Error('Failed to fetch guards');
@@ -19,6 +43,34 @@ export const createGuard = async (data: any) => {
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to create guard');
+  return response.json();
+};
+
+export const updateGuard = async (id: string, data: any) => {
+  const response = await fetch(`${API_BASE_URL}/guards/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to update guard');
+  return response.json();
+};
+
+export const deleteGuard = async (id: string) => {
+  const response = await fetch(`${API_BASE_URL}/guards/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete guard');
+  return response.json();
+};
+
+export const loginUser = async (email: string) => {
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  if (!response.ok) throw new Error('Failed to login');
   return response.json();
 };
 

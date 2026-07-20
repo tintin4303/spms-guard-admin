@@ -31,4 +31,36 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, guardId, certificateNumber, shiftPreference } = req.body;
+    
+    const updated = await prisma.guard.update({
+      where: { id },
+      data: {
+        firstName,
+        lastName,
+        guardId,
+        certificateNumber,
+        shiftPreference
+      }
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update guard' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.guard.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete guard' });
+  }
+});
+
 export default router;
