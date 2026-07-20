@@ -1,0 +1,174 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------
+// USER MANAGEMENT & NEXTAUTH
+// ---------------------------------------------
+
+enum Role {
+  ADMIN
+  OPERATION_MANAGER
+  CLIENT
+  AGENCY_MANAGER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(CLIENT)
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Relations mapped for Role-Based Access Control
+  managedAgencyId String? // Associated if role is AGENCY_MANAGER
+  agency          Agency? @relation(fields: [managedAgencyId], references: [id])
+  
+  managedContracts Contract[] // Contracts the Client owns
+}
+
+// NextAuth standard models (Accounts, Sessions, VerificationTokens typically go here)
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------
+// GUARDS & AGENCIES
+// ---------------------------------------------
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  managers  User[]   // Associated agency managers
+  guards    Guard[]  // Guards registered under this third party
+}
+
+model Guard {
+  id                 String @id @default(cuid())
+  guardId            String @unique // Auto-generated human-readable ID
+  firstName          String
+  lastName           String
+  certificateNumber  String?
+  shiftPreference    String? // Day, Night, Flexible
+  
+  agencyId           String? // Null if an in-house guard
+  agency             Agency? @relation(fields: [agencyId], references: [id])
+  
+  assignments        GuardAssignment[]
+  checkIns           OperationLog[]
+}
+
+// ---------------------------------------------
+// CONTRACTS & SITES
+// ---------------------------------------------
+
+model Contract {
+  id                   String   @id @default(cuid())
+  clientCompanyName    String
+  contactInfo          String
+  durationMonths       Int
+  startDate            DateTime
+  endDate              DateTime
+  usesThirdPartyAgency Boolean  @default(false)
+  
+  clientId             String
+  client               User     @relation(fields: [clientId], references: [id])
+  
+  sites                Site[]
+}
+
+model Site {
+  id          String @id @default(cuid())
+  name        String
+  perimeter   Json?  // Stores map perimeter (e.g., GeoJSON coordinates)
+  shiftCount  Int    @default(2) // Represents if it is 2 or 3 shift cycle
+  shiftTimings Json? // [{start: "08:00", end: "20:00"}, ...]
+  
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  
+  patrolPaths PatrolPath[]
+  assignments GuardAssignment[]
+}
+
+model GuardAssignment {
+  id         String @id @default(cuid())
+  shiftLabel String // "Morning", "Night", "Swing"
+  
+  guardId    String
+  guard      Guard @relation(fields: [guardId], references: [id])
+  
+  siteId     String
+  site       Site @relation(fields: [siteId], references: [id])
+}
+
+// ---------------------------------------------
+// PATROL MAPPING & LOGGING
+// ---------------------------------------------
+
+model PatrolPath {
+  id       String @id @default(cuid())
+  name     String // e.g., "Night Perimeter Search"
+  
+  siteId   String
+  site     Site @relation(fields: [siteId], references: [id])
+  
+  pins     MapPin[]
+}
+
+model MapPin {
+  id           String @id @default(cuid())
+  name         String // e.g., "Front Gate", "Loading Dock"
+  latitude     Float
+  longitude    Float
+  orderIndex   Int    // Order sequence within the path
+  
+  patrolPathId String
+  patrolPath   PatrolPath @relation(fields: [patrolPathId], references: [id], onDelete: Cascade)
+  
+  checkIns     OperationLog[]
+}
+
+model OperationLog {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  isIncident  Boolean  @default(false) // Flags if this log is an incident report
+  description String?
+  resolved    Boolean  @default(false) // Operation Manager can mark incident as resolved
+  
+  guardId     String
+  guard       Guard @relation(fields: [guardId], references: [id])
+  
+  mapPinId    String
+  mapPin      MapPin @relation(fields: [mapPinId], references: [id])
+}

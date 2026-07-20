@@ -45,3 +45,6 @@ next-env.d.ts
 *.md
 !README.md
 .vscode/  
+
+# AI Documents
+.ai/

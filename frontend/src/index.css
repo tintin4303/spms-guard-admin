@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #1E3A5F;
+    --secondary: #6B7280;
+    --tertiary: #2563EB;
+    --bg-app: #F8FAFC;
+    --surface: #FFFFFF;
+    --success: #16A34A;
+    --warning: #CA8A04;
+    --error: #DC2626;
+    --info: #2563EB;
+  }
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-app);
+  color: #0F172A;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Noto Serif', serif;
+}
