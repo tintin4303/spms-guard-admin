@@ -16,7 +16,8 @@ function Login({ onLogin }: { onLogin: (u: any) => void }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await loginUser(email);
+      const data = await loginUser(email, password);
+      if (data.token) localStorage.setItem('spms_token', data.token);
       onLogin(data.user);
     } catch(err) { alert("Failed to log in"); }
     setLoading(false);
@@ -156,6 +157,7 @@ function AdminUserManagement() {
   const [isCreating, setIsCreating] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('CLIENT');
 
   const loadUsers = () => fetchUsers().then(setUsers).catch(console.error);
@@ -163,7 +165,7 @@ function AdminUserManagement() {
 
   const handleCreate = async (e: any) => {
     e.preventDefault();
-    await createUser({ email, name, role });
+    await createUser({ email, name, role, password });
     setIsCreating(false);
     loadUsers();
   };
@@ -189,7 +191,7 @@ function AdminUserManagement() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#F8FAFC] border-b text-[12px] text-gray-500 uppercase tracking-wider font-semibold">
+              <tr className="bg-[#F8FAFC] text-[12px] text-gray-500 uppercase tracking-wider font-semibold">
                 <th className="px-6 py-3">Account Reference</th>
                 <th className="px-6 py-3">System Role</th>
                 <th className="px-6 py-3">Email Address</th>
@@ -199,7 +201,7 @@ function AdminUserManagement() {
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} className="border-b last:border-0 hover:bg-gray-50">
+                <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{u.name}</td>
                   <td className="px-6 py-4">
                      <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-[11px] font-bold tracking-wider">{u.role}</span>
@@ -230,6 +232,10 @@ function AdminUserManagement() {
                  <div>
                     <label className="block text-[13px] font-medium mb-1">Email Address</label>
                     <input required type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                 </div>
+                 <div>
+                    <label className="block text-[13px] font-medium mb-1">Password</label>
+                    <input required type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
                  </div>
                  <div>
                     <label className="block text-[13px] font-medium mb-1">Authorization Privilege (Role)</label>
@@ -366,7 +372,7 @@ function Contracts() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <tr className="bg-[#F8FAFC]">
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Client Entity</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Contact</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Duration</th>
@@ -381,7 +387,7 @@ function Contracts() {
                 </tr>
               ) : (
                 contracts.map((c) => (
-                  <tr key={c.id} className="border-b last:border-0 hover:bg-[#F8FAFC]">
+                  <tr key={c.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{c.clientCompanyName}</td>
                     <td className="px-6 py-4 text-[14px] text-[#475569]">{c.contactInfo}</td>
                     <td className="px-6 py-4 text-[14px] text-[#475569]">{c.durationMonths} Months</td>
@@ -558,7 +564,7 @@ function Guards() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <tr className="bg-[#F8FAFC]">
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Guard ID</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Name</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Certification</th>
@@ -573,7 +579,7 @@ function Guards() {
                 </tr>
               ) : (
                 guards.map((g) => (
-                  <tr key={g.id} className="border-b last:border-0 hover:bg-[#F8FAFC]">
+                  <tr key={g.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
                     <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
                     <td className="px-6 py-4 text-[14px] text-[#475569]">{g.certificateNumber || 'N/A'}</td>
@@ -663,6 +669,7 @@ export default function App() {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('spms_user');
+    localStorage.removeItem('spms_token');
     window.location.href = '/';
   };
 

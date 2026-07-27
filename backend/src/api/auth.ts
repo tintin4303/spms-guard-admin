@@ -1,36 +1,84 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
-router.post('/login', async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
-    const { email } = req.body;
-    
-    // Quick auto-registration for prototype usability if account doesn't exist
-    let user = await prisma.user.findUnique({ where: { email } });
-    
+    const { email, password, name } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      res.status(409).json({ error: 'User already exists' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Auto-assign roles for prototype purposes based on email
     let targetRole = 'CLIENT';
     if(email.toLowerCase().includes('admin')) targetRole = 'ADMIN';
     else if(email.toLowerCase().includes('agency') || email.toLowerCase().includes('manager')) targetRole = 'AGENCY_MANAGER';
     else if(email.toLowerCase().includes('ops')) targetRole = 'OPERATION_MANAGER';
-    
-    if (!user) {
-       user = await prisma.user.create({ 
-         data: { email, name: email.split('@')[0], role: targetRole as any } 
-       });
-    } else if (user.role !== targetRole) {
-       // Force sync prototype accounts so older db instances are corrected
-       user = await prisma.user.update({
-         where: { email },
-         data: { role: targetRole as any }
-       });
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name: name || email.split('@')[0],
+        password: hashedPassword,
+        role: targetRole as any,
+      },
+    });
+
+    const token = jwt.sign({ userId: user.id, role: user.role, email: user.email }, JWT_SECRET, {
+      expiresIn: '7d',
+    });
+
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  } catch (e) {
+    console.error('Registration error:', e);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
     }
+
+    const user = await prisma.user.findUnique({ where: { email } });
     
-    res.json({ token: 'mock-jwt-token-748923', user });
+    if (!user || !user.password) {
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
+    const token = jwt.sign({ userId: user.id, role: user.role, email: user.email }, JWT_SECRET, {
+      expiresIn: '7d',
+    });
+
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch(e) {
-    console.error(e);
+    console.error('Login error:', e);
     res.status(500).json({ error: 'Login failed' });
   }
 });
