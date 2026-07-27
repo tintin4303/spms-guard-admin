@@ -5,7 +5,9 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 
-dotenv.config();
+dotenv.config({ path: '../.env.local' });
+// Also try current directory in case it's moved
+dotenv.config({ path: '.env.local' });
 
 const app = express();
 const httpServer = createServer(app);
