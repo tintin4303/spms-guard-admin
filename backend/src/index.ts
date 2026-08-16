@@ -25,6 +25,9 @@ import guardsRouter from './api/guards';
 import contractsRouter from './api/contracts';
 import mapRouter from './api/map';
 import usersRouter from './api/users';
+import schedulesRouter from './api/schedules';
+import logsRouter from './api/logs';
+import analyticsRouter from './api/analytics';
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -35,6 +38,9 @@ app.use('/api/guards', guardsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/map', mapRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/schedules', schedulesRouter);
+app.use('/api/logs', logsRouter);
+app.use('/api/analytics', analyticsRouter);
 
 // WebSocket for real-time operations
 io.on('connection', (socket) => {

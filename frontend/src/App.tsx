@@ -1,11 +1,12 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Clock, BarChart, Calendar } from 'lucide-react';
 import DashboardLayout from './components/DashboardLayout';
 import AdminLayout from './components/AdminLayout';
 import ClientLayout from './components/ClientLayout';
 import AgencyLayout from './components/AgencyLayout';
 import MapControl from './components/MapControl';
-import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser } from './api';
+import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, fetchLogs, fetchAnalytics } from './api';
 
 function Login({ onLogin }: { onLogin: (u: any) => void }) {
   const [email, setEmail] = useState('');
@@ -83,6 +84,95 @@ function Overview({ role }: { role: string }) {
           <p className="text-[13px] text-red-600 mt-2">Administrators are not permitted to view global operations. Please use the User Management tab.</p>
        </div>
      );
+  }
+
+  if (role === 'OPERATION_MANAGER') {
+     const [stats, setStats] = useState<any>(null);
+     useEffect(() => {
+        fetchAnalytics().then(setStats).catch(console.error);
+     }, []);
+
+     return (
+       <div className="space-y-6">
+         <div>
+            <h2 className="text-[24px] font-bold font-serif text-[#1E3A5F]">Operations Command Center</h2>
+            <p className="text-[14px] text-[#6B7280] mt-1">Real-time oversight of global security operations.</p>
+         </div>
+         
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#F1F5F9] rounded-lg flex items-center justify-center border border-[#E2E8F0]">
+                 <FileText className="text-[#1E3A5F] w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Active Contracts</p>
+                 <p className="text-[28px] font-bold text-[#0F172A] leading-none mt-1">{stats?.activeContracts ?? '-'}</p>
+              </div>
+           </div>
+           
+           <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#F1F5F9] rounded-lg flex items-center justify-center border border-[#E2E8F0]">
+                 <Users className="text-[#1E3A5F] w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Guards on Duty</p>
+                 <p className="text-[28px] font-bold text-[#0F172A] leading-none mt-1">{stats?.guardsOnDuty ?? '-'}</p>
+              </div>
+           </div>
+           
+           <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#F1F5F9] rounded-lg flex items-center justify-center border border-[#E2E8F0]">
+                 <AlertTriangle className="text-[#1E3A5F] w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Pending Alerts</p>
+                 <p className="text-[28px] font-bold text-[#0F172A] leading-none mt-1">{stats?.pendingAlerts ?? '-'}</p>
+              </div>
+           </div>
+         </div>
+
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+               <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                 <h3 className="text-[16px] font-bold text-[#1E3A5F]">Recent Activity</h3>
+               </div>
+               <div className="p-0">
+                  <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-100">
+                     <CheckCircle2 className="w-5 h-5 text-gray-400" />
+                     <div>
+                        <p className="text-[14px] font-medium text-[#0F172A]">System Online</p>
+                        <p className="text-[12px] text-[#6B7280]">Metrics synced from database</p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+               <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                 <h3 className="text-[16px] font-bold text-[#1E3A5F]">Quick Actions</h3>
+               </div>
+               <div className="p-6 grid grid-cols-2 gap-4">
+                  <Link to="/dashboard/contracts" className="p-4 border border-[#E2E8F0] rounded-lg text-center hover:bg-[#F8FAFC] transition-colors flex flex-col items-center justify-center gap-2">
+                     <FileText className="w-6 h-6 text-[#1E3A5F]" />
+                     <span className="text-[13px] font-medium text-[#1E3A5F]">Manage Contracts</span>
+                  </Link>
+                  <Link to="/dashboard/schedules" className="p-4 border border-[#E2E8F0] rounded-lg text-center hover:bg-[#F8FAFC] transition-colors flex flex-col items-center justify-center gap-2">
+                     <Calendar className="w-6 h-6 text-[#1E3A5F]" />
+                     <span className="text-[13px] font-medium text-[#1E3A5F]">Shift Schedules</span>
+                  </Link>
+                  <Link to="/dashboard/logs" className="p-4 border border-[#E2E8F0] rounded-lg text-center hover:bg-[#F8FAFC] transition-colors flex flex-col items-center justify-center gap-2">
+                     <ShieldAlert className="w-6 h-6 text-[#1E3A5F]" />
+                     <span className="text-[13px] font-medium text-[#1E3A5F]">Incident Logs</span>
+                  </Link>
+                  <Link to="/dashboard/reports" className="p-4 border border-[#E2E8F0] rounded-lg text-center hover:bg-[#F8FAFC] transition-colors flex flex-col items-center justify-center gap-2">
+                     <BarChart className="w-6 h-6 text-[#1E3A5F]" />
+                     <span className="text-[13px] font-medium text-[#1E3A5F]">View Reports</span>
+                  </Link>
+               </div>
+            </div>
+         </div>
+       </div>
+     )
   }
 
   return (
@@ -498,6 +588,10 @@ function Guards() {
     guardId: `GRD-`,
     certificateNumber: '',
     shiftPreference: 'Flexible',
+    status: 'Active',
+    contactNumber: '',
+    certificationExpiry: '',
+    skills: '',
   };
   
   const [formData, setFormData] = useState(defaultFormData);
@@ -522,6 +616,10 @@ function Guards() {
       guardId: g.guardId || '',
       certificateNumber: g.certificateNumber || '',
       shiftPreference: g.shiftPreference || 'Flexible',
+      status: g.status || 'Active',
+      contactNumber: g.contactNumber || '',
+      certificationExpiry: g.certificationExpiry ? g.certificationExpiry.split('T')[0] : '',
+      skills: g.skills ? (Array.isArray(g.skills) ? g.skills : JSON.parse(g.skills)).join(', ') : '',
     });
     setIsCreating(true);
   };
@@ -537,11 +635,16 @@ function Guards() {
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setIsSubmitting(true);
+    const dataToSend = {
+      ...formData,
+      skills: formData.skills ? formData.skills.split(',').map((s: string) => s.trim()).filter(Boolean) : null,
+      certificationExpiry: formData.certificationExpiry ? new Date(formData.certificationExpiry).toISOString() : null
+    };
     try {
       if (editingId) {
-        await updateGuard(editingId, formData);
+        await updateGuard(editingId, dataToSend);
       } else {
-        await createGuard(formData);
+        await createGuard(dataToSend);
       }
       setIsCreating(false);
       loadGuards();
@@ -568,6 +671,7 @@ function Guards() {
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Guard ID</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Name</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Certification</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Shift Preference</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Actions</th>
               </tr>
@@ -582,7 +686,13 @@ function Guards() {
                   <tr key={g.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
                     <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
-                    <td className="px-6 py-4 text-[14px] text-[#475569]">{g.certificateNumber || 'N/A'}</td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">
+                      <div>{g.certificateNumber || 'N/A'}</div>
+                      {g.certificationExpiry && new Date(g.certificationExpiry) < new Date() && (
+                        <div className="text-[12px] text-red-600 font-medium">Expired</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">{g.status}</td>
                     <td className="px-6 py-4 text-[14px] text-[#475569]"><span className="px-2 py-1 bg-gray-100 rounded-full text-[12px] border">{g.shiftPreference || 'Flexible'}</span></td>
                     <td className="px-6 py-4 flex gap-2">
                        <button onClick={() => openEdit(g)} className="text-[13px] text-blue-600 hover:underline">Edit</button>
@@ -635,6 +745,32 @@ function Guards() {
                        <option value="Night">Night Shifts Only</option>
                     </select>
                  </div>
+                 
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[13px] font-medium text-gray-700 mb-1">Status</label>
+                      <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]">
+                         <option value="Active">Active</option>
+                         <option value="On Leave">On Leave</option>
+                         <option value="Suspended">Suspended</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-medium text-gray-700 mb-1">Contact Number</label>
+                      <input value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[13px] font-medium text-gray-700 mb-1">Cert Expiry Date</label>
+                      <input type="date" value={formData.certificationExpiry} onChange={e => setFormData({...formData, certificationExpiry: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-medium text-gray-700 mb-1">Skills (comma separated)</label>
+                      <input placeholder="e.g. First Aid, Armed" value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                    </div>
+                 </div>
               </div>
               
               <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
@@ -647,6 +783,318 @@ function Guards() {
         </div>
       )}
     </>
+  );
+}
+
+function Schedules() {
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [guards, setGuards] = useState<any[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    startTime: '08:00',
+    endTime: '20:00',
+    guardId: '',
+    siteId: '',
+  });
+  const [errorMsg, setErrorMsg] = useState('');
+  const [warningMsg, setWarningMsg] = useState('');
+
+  const loadSchedules = () => {
+    fetchSchedules().then(setSchedules).catch(console.error);
+  };
+
+  useEffect(() => {
+    loadSchedules();
+    fetchGuards().then(setGuards).catch(console.error);
+  }, []);
+
+  // Extract unique sites from existing schedules for the dropdown
+  const uniqueSites = schedules.reduce((acc: any[], curr) => {
+    if (curr.site && !acc.find(s => s.id === curr.site.id)) {
+      acc.push({ id: curr.site.id, name: curr.site.name });
+    }
+    return acc;
+  }, []);
+
+  const handleAssignSubmit = async (e: any) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setWarningMsg('');
+    
+    if (!formData.guardId || !formData.siteId) {
+      setErrorMsg('Please select both a Guard and a Site.');
+      return;
+    }
+
+    try {
+      const payload = {
+        shiftLabel: `${formData.date}, ${formData.startTime} - ${formData.endTime}`,
+        date: new Date(formData.date).toISOString(),
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        guardId: formData.guardId,
+        siteId: formData.siteId
+      };
+      
+      const response = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMsg(data.error || 'Failed to assign shift');
+        return;
+      }
+      
+      if (data.warning) {
+        setWarningMsg(data.warning);
+        alert(`Warning: ${data.warning}`); // simple alert for prototype
+      }
+      
+      setIsAssigning(false);
+      loadSchedules();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'An error occurred.');
+    }
+  };
+
+  return (
+    <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
+          <div>
+            <h2 className="text-[18px] font-semibold font-serif text-[#1E3A5F]">Shift Schedules</h2>
+            <p className="text-[13px] text-gray-500">Assign and monitor daily patrol rotations.</p>
+          </div>
+          <button onClick={() => setIsAssigning(true)} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
+            + Assign Shift
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white border-b border-[#E2E8F0]">
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Date &amp; Time</th>
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Contract Site</th>
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Assigned Guard</th>
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schedules.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-[13px] text-gray-500">No shift schedules found.</td>
+                </tr>
+              ) : (
+                schedules.map(sched => (
+                  <tr key={sched.id} className="hover:bg-[#F8FAFC] border-b border-gray-100">
+                    <td className="px-6 py-4">
+                      <p className="text-[14px] font-medium text-[#0F172A]">{sched.shiftLabel}</p>
+                    </td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">{sched.site?.name} ({sched.site?.contract?.clientCompanyName})</td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">{sched.guard?.guardId} ({sched.guard?.firstName} {sched.guard?.lastName})</td>
+                    <td className="px-6 py-4">
+                      <span className={`text-[14px] ${sched.status === 'Pending Reassignment' ? 'text-orange-600' : 'text-green-700'}`}>
+                        {sched.status || 'Active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {isAssigning && (
+          <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+            <form onSubmit={handleAssignSubmit} className="bg-white rounded-lg shadow-xl w-[500px] overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b bg-[#F8FAFC]">
+                <h3 className="text-lg font-serif font-semibold text-[#1E3A5F]">Assign Guard Shift</h3>
+              </div>
+              <div className="p-6 space-y-4">
+                {errorMsg && <div className="text-red-600 text-sm font-medium">{errorMsg}</div>}
+                
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Date</label>
+                  <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Start Time</label>
+                    <input type="time" required value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">End Time</label>
+                    <input type="time" required value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Site</label>
+                  <select value={formData.siteId} onChange={e => setFormData({...formData, siteId: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none">
+                    <option value="">Select a Site</option>
+                    {uniqueSites.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Guard</label>
+                  <select value={formData.guardId} onChange={e => setFormData({...formData, guardId: e.target.value})} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none">
+                    <option value="">Select a Guard</option>
+                    {guards.map((g: any) => (
+                      <option key={g.id} value={g.id}>{g.firstName} {g.lastName} ({g.guardId}) - {g.shiftPreference}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsAssigning(false)} className="px-4 py-2 border rounded text-[13px] font-medium text-gray-600 bg-white">Cancel</button>
+                <button type="submit" className="bg-[#1E3A5F] px-4 py-2 text-white text-[13px] font-medium rounded">Assign Shift</button>
+              </div>
+            </form>
+          </div>
+        )}
+    </div>
+  );
+}
+
+function Logs() {
+  const [logs, setLogs] = useState<any[]>([]);
+  useEffect(() => {
+    fetchLogs().then(setLogs).catch(console.error);
+  }, []);
+
+  return (
+    <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
+          <div>
+            <h2 className="text-[18px] font-semibold font-serif text-[#1E3A5F]">Incident Logs</h2>
+            <p className="text-[13px] text-gray-500">Real-time audit trail of field activities.</p>
+          </div>
+          <div className="flex gap-2">
+            <select className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-gray-600 outline-none focus:border-[#1E3A5F]">
+              <option>All Sites</option>
+              <option>Corporate Campus</option>
+              <option>Logistics Hub</option>
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white border-b border-[#E2E8F0]">
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Timestamp</th>
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Type</th>
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Description</th>
+                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Personnel</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-[13px] text-gray-500">No logs found.</td>
+                </tr>
+              ) : (
+                logs.map(log => (
+                  <tr key={log.id} className="hover:bg-[#F8FAFC] border-b border-gray-100">
+                    <td className="px-6 py-4 text-[13px] text-gray-600">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="px-6 py-4">
+                      {log.isIncident ? (
+                        <span className="text-[14px] text-[#C53030]">Incident</span>
+                      ) : (
+                        <span className="text-[14px] text-gray-600">Routine</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-[14px] text-[#0F172A]">{log.description || 'No description provided.'} {log.mapPin ? `(@ ${log.mapPin.name})` : ''}</td>
+                    <td className="px-6 py-4 text-[13px] text-gray-500">{log.guard ? `${log.guard.firstName} ${log.guard.lastName}` : 'System'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+    </div>
+  );
+}
+
+function Reports() {
+  const [stats, setStats] = useState<any>(null);
+  useEffect(() => {
+    fetchAnalytics().then(setStats).catch(console.error);
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+         <h2 className="text-[24px] font-bold font-serif text-[#1E3A5F]">Performance Reports</h2>
+         <p className="text-[14px] text-[#6B7280] mt-1">Key operational metrics and SLA compliance.</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
+           <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-4">Guard Attendance Rate</h3>
+           <div className="flex items-end gap-2 mb-2">
+              <span className="text-[32px] font-bold text-[#0F172A] leading-none">{stats?.attendanceRate || 0}%</span>
+              <span className="text-[13px] text-gray-600 font-medium mb-1">↑ 1.2%</span>
+           </div>
+           <p className="text-[13px] text-gray-500 mb-6">Across all active contracts this month.</p>
+           
+           <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className="bg-[#1E3A5F] h-2 rounded-full" style={{ width: `${stats?.attendanceRate || 0}%` }}></div>
+           </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
+           <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-4">Contract Fulfillment</h3>
+           <div className="flex items-end gap-2 mb-2">
+              <span className="text-[32px] font-bold text-[#0F172A] leading-none">{stats?.contractFulfillment || 0}%</span>
+              <span className="text-[13px] text-gray-400 font-medium mb-1">-</span>
+           </div>
+           <p className="text-[13px] text-gray-500 mb-6">All requested shifts have been fully staffed.</p>
+           
+           <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className="bg-[#1E3A5F] h-2 rounded-full" style={{ width: `${stats?.contractFulfillment || 0}%` }}></div>
+           </div>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
+         <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-4">Incident Resolution Time</h3>
+         <div className="flex flex-col gap-4">
+            <div>
+               <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1">
+                  <span>Critical Incidents</span>
+                  <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.critical || 0}</span> mins</span>
+               </div>
+               <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-[#1E3A5F] h-1.5 rounded-full" style={{ width: '20%' }}></div>
+               </div>
+            </div>
+            <div>
+               <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1">
+                  <span>Warning / Elevated</span>
+                  <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.warning || 0}</span> mins</span>
+               </div>
+               <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-[#475569] h-1.5 rounded-full" style={{ width: '45%' }}></div>
+               </div>
+            </div>
+            <div>
+               <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1">
+                  <span>Routine / Info</span>
+                  <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.routine || 0}</span> mins</span>
+               </div>
+               <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-[#94A3B8] h-1.5 rounded-full" style={{ width: '80%' }}></div>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
   );
 }
 
@@ -710,6 +1158,9 @@ export default function App() {
           <Route index element={<Overview role={user?.role} />} />
           <Route path="contracts" element={<Contracts />} />
           <Route path="guards" element={<Guards />} />
+          <Route path="schedules" element={<Schedules />} />
+          <Route path="logs" element={<Logs />} />
+          <Route path="reports" element={<Reports />} />
           <Route path="*" element={<div>Page under construction</div>} />
         </Route>
         

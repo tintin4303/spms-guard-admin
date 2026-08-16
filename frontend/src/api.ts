@@ -156,3 +156,22 @@ export const deletePatrolPath = async (id: string) => {
   if (!res.ok) throw new Error('Delete failed');
   return res.json();
 };
+
+export const fetchSchedules = async () => {
+  const response = await fetch(`${API_BASE_URL}/schedules`);
+  if (!response.ok) throw new Error('Failed to fetch schedules');
+  return response.json();
+};
+
+export const fetchLogs = async () => {
+  const response = await fetch(`${API_BASE_URL}/logs`);
+  if (!response.ok) throw new Error('Failed to fetch logs');
+  return response.json();
+};
+
+export const fetchAnalytics = async () => {
+  const response = await fetch(`${API_BASE_URL}/analytics/overview`);
+  if (!response.ok) throw new Error('Failed to fetch analytics');
+  return response.json();
+};
+

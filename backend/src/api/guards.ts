@@ -15,14 +15,18 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, guardId, certificateNumber, shiftPreference } = req.body;
+    const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills } = req.body;
     const guard = await prisma.guard.create({
       data: {
         firstName,
         lastName,
         guardId,
         certificateNumber,
-        shiftPreference
+        shiftPreference,
+        status: status || 'Active',
+        contactNumber,
+        certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : null,
+        skills: skills ? JSON.stringify(skills) : null
       }
     });
     res.json(guard);
@@ -34,7 +38,21 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, guardId, certificateNumber, shiftPreference } = req.body;
+    const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills } = req.body;
+    
+    // If status is changed to "On Leave", we need to flag upcoming assignments for reassignment
+    if (status === 'On Leave') {
+       await prisma.guardAssignment.updateMany({
+         where: {
+           guardId: id,
+           status: 'Scheduled',
+           date: { gte: new Date() } // future assignments
+         },
+         data: {
+           status: 'Pending Reassignment'
+         }
+       });
+    }
     
     const updated = await prisma.guard.update({
       where: { id },
@@ -43,7 +61,11 @@ router.put('/:id', async (req, res) => {
         lastName,
         guardId,
         certificateNumber,
-        shiftPreference
+        shiftPreference,
+        status,
+        contactNumber,
+        certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : null,
+        skills: skills ? JSON.stringify(skills) : null
       }
     });
     res.json(updated);
