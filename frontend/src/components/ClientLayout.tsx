@@ -17,12 +17,14 @@ export default function ClientLayout({ user, onLogout }: { user: any, onLogout: 
       {/* Client Sidebar: Clean White/Blue theme */}
       <aside className="w-[260px] flex-shrink-0 flex flex-col h-full bg-white border-r border-[#E2E8F0] shadow-sm z-10">
         <div className="px-6 pt-7 pb-6 border-b border-[#E2E8F0]">
-          <h1 className="text-[22px] font-bold leading-tight text-[#1E3A5F] font-serif">
-            SPMS Client
-          </h1>
-          <p className="text-[12px] font-medium text-blue-600 mt-1 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" /> SECURE OVERSIGHT
-          </p>
+          <Link to="/client" className="block hover:opacity-80 transition-opacity">
+            <h1 className="text-[22px] font-bold leading-tight text-[#1E3A5F] font-serif">
+              SPMS Client
+            </h1>
+            <p className="text-[12px] font-medium text-blue-600 mt-1 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> SECURE OVERSIGHT
+            </p>
+          </Link>
         </div>
 
         <nav className="flex-1 px-4 py-5 space-y-2 overflow-y-auto">
@@ -71,7 +73,7 @@ export default function ClientLayout({ user, onLogout }: { user: any, onLogout: 
         <div className="h-1 w-full bg-gradient-to-r from-blue-600 to-indigo-500 absolute top-0 left-0 z-50"></div>
         {/* Main Viewport */}
         <main className="flex-1 overflow-y-auto p-10 mt-1">
-           <div className="max-w-6xl mx-auto">
+           <div className="w-full max-w-[1400px] mx-auto">
               <Outlet />
            </div>
         </main>

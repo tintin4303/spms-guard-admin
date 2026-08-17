@@ -163,6 +163,32 @@ export const fetchSchedules = async () => {
   return response.json();
 };
 
+export const createRoster = async (data: any) => {
+  const response = await fetch(`${API_BASE_URL}/schedules/roster`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to create permanent post');
+  return response.json();
+};
+
+export const deleteRoster = async (id: string) => {
+  const res = await fetch(`${API_BASE_URL}/schedules/roster/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete permanent post');
+  return res.json();
+};
+
+export const createException = async (data: any) => {
+  const response = await fetch(`${API_BASE_URL}/schedules/exception`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to log emergency swap');
+  return response.json();
+};
+
 export const fetchLogs = async () => {
   const response = await fetch(`${API_BASE_URL}/logs`);
   if (!response.ok) throw new Error('Failed to fetch logs');

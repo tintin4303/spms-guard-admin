@@ -18,12 +18,14 @@ export default function AgencyLayout({ user, onLogout }: { user: any, onLogout: 
       {/* Agency Sidebar: Clean Emerald/Dark theme for external vendors */}
       <aside className="w-[250px] flex-shrink-0 flex flex-col h-full bg-[#064E3B]">
         <div className="px-6 pt-7 pb-6 border-b border-emerald-800">
-          <h1 className="text-[20px] font-bold leading-tight text-white font-serif flex items-center gap-2">
-            SPMS <Shield className="w-5 h-5 text-emerald-400" />
-          </h1>
-          <p className="text-[12px] font-medium tracking-wide text-emerald-400 mt-1 uppercase">
-            Vendor Portal
-          </p>
+          <Link to="/agency" className="block hover:opacity-80 transition-opacity">
+            <h1 className="text-[20px] font-bold leading-tight text-white font-serif flex items-center gap-2">
+              SPMS <Shield className="w-5 h-5 text-emerald-400" />
+            </h1>
+            <p className="text-[12px] font-medium tracking-wide text-emerald-400 mt-1 uppercase">
+              Vendor Portal
+            </p>
+          </Link>
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
@@ -69,7 +71,7 @@ export default function AgencyLayout({ user, onLogout }: { user: any, onLogout: 
         </header>
 
         <main className="flex-1 overflow-y-auto p-10">
-           <div className="max-w-6xl mx-auto h-full">
+           <div className="w-full max-w-[1400px] mx-auto h-full">
               <Outlet />
            </div>
         </main>

@@ -36,12 +36,14 @@ export default function DashboardLayout({ user, onLogout }: { user: any, onLogou
       {/* Sidebar: Primary Navy Color #1E3A5F */}
       <aside className="w-[240px] flex-shrink-0 flex flex-col h-full bg-[#1E3A5F]">
         <div className="px-5 pt-6 pb-5 border-b border-white/10">
-          <h1 className="text-[24px] font-bold leading-tight text-white font-serif">
-            SPMS Command
-          </h1>
-          <p className="text-[11px] font-semibold tracking-wider text-blue-200 mt-1 uppercase">
-            Operations Portal
-          </p>
+          <Link to="/dashboard" className="block hover:opacity-80 transition-opacity">
+            <h1 className="text-[24px] font-bold leading-tight text-white font-serif">
+              SPMS Command
+            </h1>
+            <p className="text-[11px] font-semibold tracking-wider text-blue-200 mt-1 uppercase">
+              Operations Portal
+            </p>
+          </Link>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
@@ -104,7 +106,7 @@ export default function DashboardLayout({ user, onLogout }: { user: any, onLogou
 
         {/* Main Content Pane */}
         <main className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC]">
-          <div className="max-w-6xl mx-auto">
+          <div className="w-full max-w-[1400px] mx-auto">
              <Outlet />
           </div>
         </main>

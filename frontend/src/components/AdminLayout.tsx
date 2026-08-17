@@ -15,12 +15,14 @@ export default function AdminLayout({ user, onLogout }: { user: any, onLogout: (
       {/* Admin Sidebar: Dark Gray/Black theme to differentiate from Ops */}
       <aside className="w-[240px] flex-shrink-0 flex flex-col h-full bg-[#0F172A]">
         <div className="px-5 pt-6 pb-5 border-b border-white/10">
-          <h1 className="text-[20px] font-bold leading-tight text-white font-serif">
-            SPMS Identity
-          </h1>
-          <p className="text-[11px] font-semibold tracking-wider text-red-400 mt-1 uppercase">
-            Admin Root Console
-          </p>
+          <Link to="/admin" className="block hover:opacity-80 transition-opacity">
+            <h1 className="text-[20px] font-bold leading-tight text-white font-serif">
+              SPMS Identity
+            </h1>
+            <p className="text-[11px] font-semibold tracking-wider text-red-400 mt-1 uppercase">
+              Admin Root Console
+            </p>
+          </Link>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
@@ -77,7 +79,7 @@ export default function AdminLayout({ user, onLogout }: { user: any, onLogout: (
 
         {/* Main Viewport */}
         <main className="flex-1 overflow-y-auto p-8">
-           <div className="max-w-5xl mx-auto">
+           <div className="w-full max-w-[1200px] mx-auto">
               <Outlet />
            </div>
         </main>

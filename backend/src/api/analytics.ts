@@ -8,8 +8,8 @@ router.get('/overview', async (req, res) => {
   try {
     const totalContracts = await prisma.contract.count();
     
-    // Total guards assigned to any shift
-    const uniqueGuardsOnDuty = await prisma.guardAssignment.findMany({
+    // Total permanent guards assigned to roster patterns
+    const uniqueGuardsOnDuty = await prisma.siteRoster.findMany({
       distinct: ['guardId'],
       select: { guardId: true }
     });

@@ -89,7 +89,8 @@ model Guard {
   agencyId           String? // Null if an in-house guard
   agency             Agency? @relation(fields: [agencyId], references: [id])
   
-  assignments        GuardAssignment[]
+  rosters            SiteRoster[]
+  replacements       ShiftException[] @relation("ReplacementGuardRelation")
   checkIns           OperationLog[]
 }
 
@@ -123,22 +124,34 @@ model Site {
   contract    Contract @relation(fields: [contractId], references: [id])
   
   patrolPaths PatrolPath[]
-  assignments GuardAssignment[]
+  rosters SiteRoster[]
 }
 
-model GuardAssignment {
+model SiteRoster {
   id         String @id @default(cuid())
-  shiftLabel String // "Morning", "Night", "Swing"
-  date       DateTime @default(now())
+  shiftLabel String // e.g. "Morning Shift"
   startTime  String   @default("08:00") // e.g., "08:00"
   endTime    String   @default("20:00") // e.g., "20:00"
-  status     String   @default("Scheduled") // Scheduled, Completed, Missed, Pending Reassignment
   
   guardId    String
   guard      Guard @relation(fields: [guardId], references: [id])
   
   siteId     String
   site       Site @relation(fields: [siteId], references: [id])
+
+  exceptions ShiftException[]
+}
+
+model ShiftException {
+  id                 String @id @default(cuid())
+  date               DateTime // The distinct date being modified
+  type               String   @default("Absent") // "Absent", "Swap"
+  
+  rosterId           String
+  roster             SiteRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  
+  replacementGuardId String?
+  replacementGuard   Guard?  @relation("ReplacementGuardRelation", fields: [replacementGuardId], references: [id])
 }
 
 // ---------------------------------------------

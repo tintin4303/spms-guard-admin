@@ -9,7 +9,15 @@ router.get('/', async (req, res) => {
     const logs = await prisma.operationLog.findMany({
       include: {
         guard: true,
-        mapPin: true
+        mapPin: {
+          include: {
+            patrolPath: {
+              include: {
+                site: true
+              }
+            }
+          }
+        }
       },
       orderBy: {
         timestamp: 'desc'

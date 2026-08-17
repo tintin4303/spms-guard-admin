@@ -6,92 +6,121 @@ const prisma = new PrismaClient();
 
 router.get('/', async (req, res) => {
   try {
-    const assignments = await prisma.guardAssignment.findMany({
+    const rosters = await prisma.siteRoster.findMany({
       include: {
         guard: true,
         site: {
           include: {
             contract: true
           }
+        },
+        exceptions: {
+          include: {
+            replacementGuard: true
+          }
         }
-      },
-      orderBy: {
-        id: 'desc'
       }
     });
-    res.json(assignments);
+
+    const schedules = [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    for (let i = 0; i < 7; i++) {
+       const targetDate = new Date(today);
+       targetDate.setDate(targetDate.getDate() + i);
+       const dateStr = targetDate.toISOString().split('T')[0];
+
+       for (const r of rosters) {
+          const ex = r.exceptions.find((e: any) => new Date(e.date).toISOString().split('T')[0] === dateStr);
+          
+          let status = 'Scheduled (Permanent)';
+          let activeGuard: any = r.guard;
+          
+          if (ex) {
+             if (ex.type === 'Absent') {
+                 status = 'Absent (Uncovered)';
+                 activeGuard = { firstName: 'UNCOVERED', lastName: 'SHIFT', guardId: '!!!' };
+             } else if (ex.type === 'Swap') {
+                 status = 'Swap Replacement';
+                 activeGuard = ex.replacementGuard || { firstName: 'Temp', lastName: 'Guard', guardId: 'TMP' };
+             }
+          }
+
+          schedules.push({
+             id: ex ? `ex_${ex.id}` : `ros_${r.id}_${dateStr}`,
+             rosterId: r.id,
+             date: new Date(targetDate).toISOString(), // Full ISO string for frontend date parsing
+             startTime: r.startTime,
+             endTime: r.endTime,
+             shiftLabel: `${dateStr}, ${r.startTime} - ${r.endTime}`,
+             guard: activeGuard,
+             site: r.site,
+             status
+          });
+       }
+    }
+    
+    // Sort chronologically by date then startTime
+    schedules.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.startTime.localeCompare(b.startTime));
+    
+    res.json(schedules);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch schedules' });
+    res.status(500).json({ error: 'Failed to fetch patterned schedules' });
   }
 });
 
-router.post('/', async (req, res) => {
+// Create Permanent Site Roster
+router.post('/roster', async (req, res) => {
   try {
-    const { shiftLabel, date, startTime, endTime, guardId, siteId } = req.body;
+    const { startTime, endTime, guardId, siteId } = req.body;
     
-    // 1. Check Guard Certification Expiry and Status
-    const guard = await prisma.guard.findUnique({ where: { id: guardId } });
-    if (!guard) return res.status(404).json({ error: 'Guard not found' });
-    
-    if (guard.status === 'On Leave' || guard.status === 'Suspended') {
-      return res.status(400).json({ error: `Cannot assign guard. Status is ${guard.status}` });
-    }
-    
-    if (guard.certificationExpiry && new Date(guard.certificationExpiry) < new Date()) {
-      return res.status(400).json({ error: 'Guard certification is expired' });
-    }
-
-    // 2. Check Double Booking
-    const assignmentDate = new Date(date);
-    const existingAssignments = await prisma.guardAssignment.findMany({
-      where: {
-        guardId,
-        date: assignmentDate,
-        status: { notIn: ['Completed', 'Missed', 'Pending Reassignment'] }
-      }
-    });
-
-    const isOverlapping = existingAssignments.some(a => {
-      // Simple overlap logic: assuming times don't cross midnight for this basic check
-      return (startTime < a.endTime && endTime > a.startTime);
-    });
-
-    if (isOverlapping) {
-      return res.status(400).json({ error: 'Guard is already booked for this time period' });
-    }
-
-    // 3. Shift Preference Warning
-    let warning = null;
-    if (guard.shiftPreference && guard.shiftPreference !== 'Flexible') {
-       const isDayShift = parseInt(startTime.split(':')[0]) >= 6 && parseInt(startTime.split(':')[0]) < 18;
-       if (guard.shiftPreference === 'Day' && !isDayShift) warning = "Shift mismatch: Guard prefers Day shifts.";
-       if (guard.shiftPreference === 'Night' && isDayShift) warning = "Shift mismatch: Guard prefers Night shifts.";
-    }
-
-    const assignment = await prisma.guardAssignment.create({
+    // Simplistic overlap and warning checks could go here
+    const roster = await prisma.siteRoster.create({
       data: {
-        shiftLabel,
-        date: assignmentDate,
+        shiftLabel: 'Standard Shift',
         startTime,
         endTime,
-        status: 'Scheduled',
         guardId,
         siteId
-      },
-      include: {
-        guard: true,
-        site: {
-          include: {
-            contract: true
-          }
-        }
       }
     });
-    res.json({ assignment, warning });
+    res.json(roster);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to create schedule' });
+    res.status(500).json({ error: 'Failed to create permanent roster' });
+  }
+});
+
+// Delete Permanent Roster
+router.delete('/roster/:id', async (req, res) => {
+  try {
+    await prisma.siteRoster.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Failed to delete roster' });
+  }
+});
+
+// Log an Exception (Absence / Swap)
+router.post('/exception', async (req, res) => {
+  try {
+    const { date, type, rosterId, replacementGuardId } = req.body;
+    const shiftDate = new Date(date);
+    
+    const exception = await prisma.shiftException.create({
+      data: {
+        date: shiftDate,
+        type,
+        rosterId,
+        replacementGuardId: replacementGuardId || null
+      }
+    });
+    res.json(exception);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to log exception' });
   }
 });
 
