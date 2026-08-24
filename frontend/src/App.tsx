@@ -952,7 +952,6 @@ function Schedules() {
  const handleRosterSubmit = async (e: any) => {
  e.preventDefault();
  setErrorMsg('');
- setWarningMsg('');
  if (!formData.guardId || !formData.siteId) return setErrorMsg('Guard and Site are required.');
  
  const selectedGuard = guards.find(g => g.id === formData.guardId);
