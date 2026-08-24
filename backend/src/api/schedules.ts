@@ -6,7 +6,11 @@ const prisma = new PrismaClient();
 
 router.get('/', async (req, res) => {
   try {
+    const { agencyId } = req.query;
+    const guardWhere = agencyId ? { agencyId: String(agencyId) } : {};
+
     const rosters = await prisma.siteRoster.findMany({
+      where: { guard: guardWhere },
       include: {
         guard: true,
         site: {

@@ -6,7 +6,9 @@ const prisma = new PrismaClient();
 
 router.get('/', async (req, res) => {
   try {
-    const guards = await prisma.guard.findMany();
+    const { agencyId } = req.query;
+    const where = agencyId ? { agencyId: String(agencyId) } : {};
+    const guards = await prisma.guard.findMany({ where });
     res.json(guards);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch guards' });

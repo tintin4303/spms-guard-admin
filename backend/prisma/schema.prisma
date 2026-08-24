@@ -121,7 +121,7 @@ model Site {
   shiftTimings Json? // [{start: "08:00", end: "20:00"}, ...]
   
   contractId  String
-  contract    Contract @relation(fields: [contractId], references: [id])
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   
   patrolPaths PatrolPath[]
   rosters SiteRoster[]
@@ -137,7 +137,7 @@ model SiteRoster {
   guard      Guard @relation(fields: [guardId], references: [id])
   
   siteId     String
-  site       Site @relation(fields: [siteId], references: [id])
+  site       Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   exceptions ShiftException[]
 }
@@ -163,7 +163,7 @@ model PatrolPath {
   name     String // e.g., "Night Perimeter Search"
   
   siteId   String
-  site     Site @relation(fields: [siteId], references: [id])
+  site     Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
   
   pins     MapPin[]
 }
@@ -192,5 +192,5 @@ model OperationLog {
   guard       Guard @relation(fields: [guardId], references: [id])
   
   mapPinId    String
-  mapPin      MapPin @relation(fields: [mapPinId], references: [id])
+  mapPin      MapPin @relation(fields: [mapPinId], references: [id], onDelete: Cascade)
 }

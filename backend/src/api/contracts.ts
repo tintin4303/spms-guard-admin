@@ -6,7 +6,10 @@ const prisma = new PrismaClient();
 
 router.get('/', async (req, res) => {
   try {
+    const { clientId } = req.query;
+    const where = clientId ? { clientId: String(clientId) } : {};
     const contracts = await prisma.contract.findMany({
+      where,
       include: { sites: true, client: true }
     });
     res.json(contracts);

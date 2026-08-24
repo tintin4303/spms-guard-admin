@@ -6,8 +6,12 @@ const prisma = new PrismaClient();
 
 router.get('/paths', async (req, res) => {
   try {
-    const { siteId } = req.query;
-    const whereClause = siteId ? { siteId: String(siteId) } : {};
+    const { siteId, clientId } = req.query;
+    const whereClause: any = {};
+    if (siteId) whereClause.siteId = String(siteId);
+    if (clientId) {
+       whereClause.site = { contract: { clientId: String(clientId) } };
+    }
     const paths = await prisma.patrolPath.findMany({ where: whereClause, include: { pins: true } });
     res.json(paths);
   } catch (error) {

@@ -10,8 +10,8 @@ const prisma = new PrismaClient();
 // Protect all user routes
 router.use(authenticateToken);
 
-// Get all users (Admin only)
-router.get('/', requireRole(['ADMIN']), async (req, res) => {
+// Get all users (Admin and Operation Manager)
+router.get('/', requireRole(['ADMIN', 'OPERATION_MANAGER']), async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, image: true, emailVerified: true }
