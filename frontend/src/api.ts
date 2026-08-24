@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isLocal ? 'http://localhost:3001/api' : '/api';
 
 const getAuthHeaders = () => {
  const token = localStorage.getItem('spms_token');
