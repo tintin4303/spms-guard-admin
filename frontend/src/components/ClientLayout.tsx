@@ -5,7 +5,6 @@ const clientNav = [
  { href: '/client', icon: Briefcase, label: 'My Contracts' },
  { href: '/client/map', icon: Map, label: 'Live Patrol Map' },
  { href: '/client/reports', icon: BarChart2, label: 'Analytics & Reports' },
- { href: '/client/settings', icon: Settings, label: 'Account Settings' },
 ];
 
 export default function ClientLayout({ user, onLogout }: { user: any, onLogout: () => void }) {
@@ -29,7 +28,7 @@ export default function ClientLayout({ user, onLogout }: { user: any, onLogout: 
 
  <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
  {clientNav.map(({ icon: Icon, label, href }) => {
- const isActive = pathname === href || (pathname !== '/client' && pathname.startsWith(href));
+ const isActive = pathname === href || (href !== '/client' && pathname.startsWith(href));
  return (
  <Link
  key={label}

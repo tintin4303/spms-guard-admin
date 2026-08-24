@@ -76,6 +76,20 @@ function Login({ onLogin }: { onLogin: (u: any) => void }) {
 }
 
 
+function Pagination({ currentPage, totalPages, onPageChange }: { currentPage: number, totalPages: number, onPageChange: (p: number) => void }) {
+  const displayTotal = totalPages < 1 ? 1 : totalPages;
+  return (
+    <div className="px-6 py-3 border-t border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC]">
+      <span className="text-[13px] text-gray-500">Page {currentPage} of {displayTotal}</span>
+      <div className="flex gap-2">
+        <button type="button" disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)} className="px-3 py-1 border rounded text-[13px] disabled:opacity-50 bg-white hover:bg-gray-50 transition-colors text-gray-700">Previous</button>
+        <button type="button" disabled={currentPage >= displayTotal} onClick={() => onPageChange(currentPage + 1)} className="px-3 py-1 border rounded text-[13px] disabled:opacity-50 bg-white hover:bg-gray-50 transition-colors text-gray-700">Next</button>
+      </div>
+    </div>
+  );
+}
+
+
 function Overview({ role }: { role: string }) {
  const [stats, setStats] = useState<any>(null);
  const [recentLogs, setRecentLogs] = useState<any[]>([]);
@@ -200,6 +214,11 @@ function Overview({ role }: { role: string }) {
 
 function ClientContracts({ user }: { user?: any }) {
  const [contracts, setContracts] = useState<any[]>([]);
+ const [currentPage, setCurrentPage] = useState(1);
+ const itemsPerPage = 10;
+ const totalPages = Math.ceil(contracts.length / itemsPerPage);
+ const paginatedContracts = contracts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
  useEffect(() => {
  fetchContracts(user?.id).then(setContracts).catch(console.error);
  }, [user]);
@@ -229,25 +248,31 @@ function ClientContracts({ user }: { user?: any }) {
  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No active contracts found.</td>
  </tr>
  ) : (
- contracts.map((c) => (
+ paginatedContracts.map((c) => (
  <tr key={c.id} className="hover:bg-[#F8FAFC] border-b border-gray-100 last:border-0">
  <td className="px-6 py-4 text-[12px] font-medium text-blue-600">{c.id.substring(0,8).toUpperCase()}</td>
  <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{c.client?.name || 'My Company'}</td>
  <td className="px-6 py-4 text-[14px] text-[#475569]">{new Date(c.startDate).toLocaleDateString()} — {new Date(c.endDate).toLocaleDateString()}</td>
  <td className="px-6 py-4 text-[14px] text-[#475569]">{c.sites?.[0]?.name ? c.sites[0].name : 'Primary Facility'} <span className="text-gray-400 text-[12px]">({c.sites?.[0]?.address || 'Registered Address'})</span></td>
- <td className="px-6 py-4 text-[14px]"><span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase">Active</span></td>
+ <td className="px-6 py-4 text-[14px] font-medium text-green-700">Active</td>
  </tr>
  ))
  )}
  </tbody>
  </table>
  </div>
+ <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
  </div>
  )
 }
 
 function AdminUserManagement() {
  const [users, setUsers] = useState<any[]>([]);
+ const [currentPage, setCurrentPage] = useState(1);
+ const itemsPerPage = 10;
+ const totalPages = Math.ceil(users.length / itemsPerPage);
+ const paginatedUsers = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
  const [isCreating, setIsCreating] = useState(false);
  const [email, setEmail] = useState('');
  const [name, setName] = useState('');
@@ -294,7 +319,7 @@ function AdminUserManagement() {
  </tr>
  </thead>
  <tbody>
- {users.map(u => (
+ {paginatedUsers.map(u => (
  <tr key={u.id} className="hover:bg-gray-50">
  <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{u.name}</td>
  <td className="px-6 py-4">
@@ -310,6 +335,7 @@ function AdminUserManagement() {
  </tbody>
  </table>
  </div>
+ <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
  </div>
  
  {isCreating && (
@@ -354,6 +380,11 @@ function AdminUserManagement() {
 
 function Contracts() {
  const [contracts, setContracts] = useState<any[]>([]);
+ const [currentPage, setCurrentPage] = useState(1);
+ const itemsPerPage = 10;
+ const totalPages = Math.ceil(contracts.length / itemsPerPage);
+ const paginatedContracts = contracts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
  const [clients, setClients] = useState<any[]>([]);
  const [isCreating, setIsCreating] = useState(false);
  const [editingId, setEditingId] = useState<string | null>(null);
@@ -484,7 +515,7 @@ function Contracts() {
  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No contracts provisioned.</td>
  </tr>
  ) : (
- contracts.map((c) => (
+ paginatedContracts.map((c) => (
  <tr key={c.id} className="hover:bg-[#F8FAFC]">
  <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{c.clientCompanyName}</td>
  <td className="px-6 py-4 text-[14px] text-[#475569]">{c.contactInfo}</td>
@@ -500,6 +531,7 @@ function Contracts() {
  </tbody>
  </table>
  </div>
+ <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
  </div>
 
  {isCreating && (
@@ -601,6 +633,11 @@ function Contracts() {
 
 function Guards() {
  const [guards, setGuards] = useState<any[]>([]);
+ const [currentPage, setCurrentPage] = useState(1);
+ const itemsPerPage = 10;
+ const totalPages = Math.ceil(guards.length / itemsPerPage);
+ const paginatedGuards = guards.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
  const [isCreating, setIsCreating] = useState(false);
  const [editingId, setEditingId] = useState<string | null>(null);
  const [isSubmitting, setIsSubmitting] = useState(false);
@@ -705,7 +742,7 @@ function Guards() {
  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No guards found in roster.</td>
  </tr>
  ) : (
- guards.map((g) => (
+ paginatedGuards.map((g) => (
  <tr key={g.id} className="hover:bg-[#F8FAFC]">
  <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
  <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
@@ -716,7 +753,7 @@ function Guards() {
  )}
  </td>
  <td className="px-6 py-4 text-[14px] text-[#475569]">{g.status}</td>
- <td className="px-6 py-4 text-[14px] text-[#475569]"><span className="px-2 py-1 bg-gray-100 rounded-full text-[12px] border">{g.shiftPreference || 'Flexible'}</span></td>
+ <td className="px-6 py-4 text-[14px] text-[#475569] font-medium">{g.shiftPreference || 'Flexible'}</td>
  <td className="px-6 py-4 flex gap-2">
  <button onClick={() => openEdit(g)} className="text-[13px] text-blue-600 hover:underline">Edit</button>
  <button onClick={() => handleDelete(g.id)} className="text-[13px] text-red-600 hover:underline">Offboard</button>
@@ -727,6 +764,7 @@ function Guards() {
  </tbody>
  </table>
  </div>
+ <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
  </div>
 
  {isCreating && (
@@ -833,6 +871,11 @@ function Guards() {
 
 function Schedules() {
  const [schedules, setSchedules] = useState<any[]>([]);
+ const [currentPage, setCurrentPage] = useState(1);
+ const itemsPerPage = 10;
+ const totalPages = Math.ceil(schedules.length / itemsPerPage);
+ const paginatedSchedules = schedules.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
  const [guards, setGuards] = useState<any[]>([]);
  const [isAssigning, setIsAssigning] = useState(false);
  const [editingId, setEditingId] = useState<string | null>(null);
@@ -1000,7 +1043,7 @@ function Schedules() {
  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-500">No shift schedules found.</td>
  </tr>
  ) : (
- schedules.map(sched => (
+ paginatedSchedules.map(sched => (
  <tr key={sched.id} className="hover:bg-[#F8FAFC] border-b border-gray-100">
  <td className="px-6 py-4">
  <p className="text-[14px] font-medium text-[#0F172A]">{sched.shiftLabel}</p>
@@ -1023,6 +1066,7 @@ function Schedules() {
  )}
  </tbody>
  </table>
+ <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
  </div>
  ) : (
  <div className="p-6 overflow-x-auto bg-[#F8FAFC]">
@@ -1454,7 +1498,7 @@ function AgencyGuards() {
  )}
  </td>
  <td className="px-6 py-4 text-[14px] text-[#475569]">{g.status}</td>
- <td className="px-6 py-4 text-[14px] text-[#475569]"><span className="px-2 py-1 bg-gray-100 rounded-full text-[12px] border">{g.shiftPreference || 'Flexible'}</span></td>
+ <td className="px-6 py-4 text-[14px] text-[#475569] font-medium">{g.shiftPreference || 'Flexible'}</td>
  </tr>
  ))
  )}

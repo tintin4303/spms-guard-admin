@@ -22,7 +22,6 @@ const navItems = [
  { href: '/dashboard/schedules', icon: CalendarDays, label: 'Schedules', roles: ['OPERATION_MANAGER', 'AGENCY_MANAGER'] },
  { href: '/dashboard/logs', icon: BookOpen, label: 'Log', roles: ['OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
  { href: '/dashboard/reports', icon: BarChart2, label: 'Reports', roles: ['OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
- { href: '/dashboard/settings', icon: Settings, label: 'Settings', roles: ['ADMIN', 'OPERATION_MANAGER', 'CLIENT', 'AGENCY_MANAGER'] },
 ];
 
 export default function DashboardLayout({ user, onLogout }: { user: any, onLogout: () => void }) {

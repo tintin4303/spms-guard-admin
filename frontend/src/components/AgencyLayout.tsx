@@ -6,7 +6,6 @@ const agencyNav = [
  { href: '/agency/schedules', icon: CalendarDays, label: 'Shift Schedules' },
  { href: '/agency/logs', icon: BookOpen, label: 'Incident Reports' },
  { href: '/agency/reports', icon: BarChart2, label: 'Performance Analytics' },
- { href: '/agency/settings', icon: Settings, label: 'Vendor Settings' },
 ];
 
 export default function AgencyLayout({ user, onLogout }: { user: any, onLogout: () => void }) {
@@ -30,7 +29,7 @@ export default function AgencyLayout({ user, onLogout }: { user: any, onLogout: 
 
  <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
  {agencyNav.map(({ icon: Icon, label, href }) => {
- const isActive = pathname === href || (pathname !== '/agency' && pathname.startsWith(href));
+ const isActive = pathname === href || (href !== '/agency' && pathname.startsWith(href));
  return (
  <Link
  key={label}

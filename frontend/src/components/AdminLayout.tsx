@@ -26,7 +26,7 @@ export default function AdminLayout({ user, onLogout }: { user: any, onLogout: (
 
  <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
  {adminNav.map(({ icon: Icon, label, href }) => {
- const isActive = pathname === href || (pathname !== '/admin' && pathname.startsWith(href));
+ const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href));
  return (
  <Link
  key={label}
