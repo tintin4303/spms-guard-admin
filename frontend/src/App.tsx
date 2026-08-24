@@ -322,9 +322,7 @@ function AdminUserManagement() {
  {paginatedUsers.map(u => (
  <tr key={u.id} className="hover:bg-gray-50">
  <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{u.name}</td>
- <td className="px-6 py-4">
- <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-[11px] font-bold tracking-wider">{u.role}</span>
- </td>
+ <td className="px-6 py-4 text-[14px] text-gray-600">{u.role}</td>
  <td className="px-6 py-4 text-[14px] text-gray-500">{u.email}</td>
  <td className="px-6 py-4 text-[14px] text-gray-400">System Genesis</td>
  <td className="px-6 py-4">
