@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Users, LogOut, ShieldAlert, Shield, Bell } from 'lucide-react';
+import { LogOut, Shield } from 'lucide-react';
 
 const adminNav = [
  { href: '/admin', icon: Shield, label: 'User Registry' },

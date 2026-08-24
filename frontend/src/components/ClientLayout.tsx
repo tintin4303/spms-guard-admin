@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Briefcase, Map, BarChart2, Settings, LogOut, CheckCircle2, Bell, ShieldAlert } from 'lucide-react';
+import { Briefcase, Map, BarChart2, LogOut } from 'lucide-react';
 
 const clientNav = [
  { href: '/client', icon: Briefcase, label: 'My Contracts' },

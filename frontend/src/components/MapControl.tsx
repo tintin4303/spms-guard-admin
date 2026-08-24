@@ -258,7 +258,7 @@ export default function MapControl({ user }: { user?: any }) {
  properties: {},
  geometry: {
  type: 'LineString',
- coordinates: smartGeometry.length > 0 ? smartGeometry : activePins.map(p => [p.lng ?? p.longitude, p.lat ?? p.latitude])
+ coordinates: smartGeometry.length > 0 ? smartGeometry : activePins.map((p: any) => [p.lng ?? p.longitude, p.lat ?? p.latitude])
  }
  };
 
@@ -285,7 +285,7 @@ export default function MapControl({ user }: { user?: any }) {
  <div className="mt-4 mb-6 relative">
  <h3 className="text-gray-400 text-[11px] uppercase font-bold tracking-wider mb-2 px-1">Active Route Checkpoints</h3>
  <div className="space-y-2 border-l-2 border-[#334155] ml-2 pl-3">
- {activePins.map((pin, i) => (
+ {activePins.map((pin: any, i: number) => (
  <div 
  key={i} 
  draggable={!isClient} 

@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Users, CalendarDays, BookOpen, BarChart2, Settings, LogOut, Shield, Bell, ShieldAlert } from 'lucide-react';
+import { Users, CalendarDays, BookOpen, BarChart2, LogOut } from 'lucide-react';
 
 const agencyNav = [
  { href: '/agency', icon: Users, label: 'Agency Roster' },

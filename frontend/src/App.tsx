@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Clock, BarChart, Calendar, Search } from 'lucide-react';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, BarChart, Calendar, Search } from 'lucide-react';
 import DashboardLayout from './components/DashboardLayout';
 import AdminLayout from './components/AdminLayout';
 import ClientLayout from './components/ClientLayout';
@@ -877,8 +877,6 @@ function Schedules() {
  const paginatedSchedules = schedules.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
  const [guards, setGuards] = useState<any[]>([]);
- const [isAssigning, setIsAssigning] = useState(false);
- const [editingId, setEditingId] = useState<string | null>(null);
  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
  const [isCreatingRoster, setIsCreatingRoster] = useState(false);
  const [isCreatingException, setIsCreatingException] = useState(false);
@@ -895,7 +893,6 @@ function Schedules() {
  };
  const [formData, setFormData] = useState(defaultFormData);
  const [errorMsg, setErrorMsg] = useState('');
- const [warningMsg, setWarningMsg] = useState('');
 
  const loadSchedules = () => {
  fetchSchedules().then(setSchedules).catch(console.error);
@@ -915,7 +912,6 @@ function Schedules() {
  }, []);
 
  const openCreateRoster = () => {
- setEditingId(null);
  setFormData(defaultFormData);
  setIsCreatingRoster(true);
  };
@@ -929,7 +925,6 @@ function Schedules() {
  endTime: sched.endTime,
  type: 'Absent'
  });
- setEditingId(sched.id);
  setIsCreatingException(true);
  };
 

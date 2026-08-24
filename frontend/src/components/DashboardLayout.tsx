@@ -7,10 +7,7 @@ import {
  Map,
  BookOpen,
  BarChart2,
- Settings,
  LogOut,
- Bell,
- ShieldAlert,
 } from 'lucide-react';
 
 const navItems = [
