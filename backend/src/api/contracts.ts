@@ -1,13 +1,21 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 
+import jwt from 'jsonwebtoken';
+
 const router = Router();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
 router.get('/', async (req, res) => {
   try {
-    const { clientId } = req.query;
-    const where = clientId ? { clientId: String(clientId) } : {};
+    const token = req.headers.authorization?.split(' ')[1];
+    let user: any = null;
+    if (token) {
+      try { user = jwt.verify(token, JWT_SECRET); } catch (e) { }
+    }
+    const where = user?.role === 'CLIENT' ? { clientId: user.userId } : {};
+
     const contracts = await prisma.contract.findMany({
       where,
       include: { sites: true, client: true }
@@ -21,7 +29,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { clientCompanyName, contactInfo, durationMonths, clientId, startDate, endDate, sites } = req.body;
-    
+
     // Safety check against hardcoded frontend clientId
     let validClientId = String(clientId || 'dummy-client-id');
     const clientExists = await prisma.user.findUnique({ where: { id: validClientId } });
@@ -41,10 +49,10 @@ router.post('/', async (req, res) => {
         sites: {
           create: sites && sites.length > 0
             ? sites.map((s: any) => ({
-                 name: s.name || s,
-                 shiftCount: s.shiftCount || 2,
-                 shiftTimings: s.shiftTimings || []
-              }))
+              name: s.name || s,
+              shiftCount: s.shiftCount || 2,
+              shiftTimings: s.shiftTimings || []
+            }))
             : [{ name: 'Default Site' }]
         }
       },
@@ -61,7 +69,7 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { clientCompanyName, contactInfo, durationMonths, startDate, endDate, sites } = req.body;
-    
+
     // Nuke existing sites to cleanly override with the new updated structure
     await prisma.site.deleteMany({ where: { contractId: id } });
 
@@ -76,10 +84,10 @@ router.put('/:id', async (req, res) => {
         sites: {
           create: sites && sites.length > 0
             ? sites.map((s: any) => ({
-                 name: s.name || s,
-                 shiftCount: s.shiftCount || 2,
-                 shiftTimings: s.shiftTimings || []
-              }))
+              name: s.name || s,
+              shiftCount: s.shiftCount || 2,
+              shiftTimings: s.shiftTimings || []
+            }))
             : [{ name: 'Default Site' }]
         }
       },

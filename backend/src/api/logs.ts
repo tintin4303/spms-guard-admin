@@ -1,12 +1,28 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 
+import jwt from 'jsonwebtoken';
+
 const router = Router();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
 router.get('/', async (req, res) => {
   try {
+    const token = req.headers.authorization?.split(' ')[1];
+    let user: any = null;
+    if (token) {
+      try { user = jwt.verify(token, JWT_SECRET); } catch (e) {}
+    }
+
+    const where: any = {};
+    if (user?.role === 'CLIENT') {
+      where.mapPin = { patrolPath: { site: { contract: { clientId: user.userId } } } };
+      where.resolved = true; // Use resolved flag as a proxy for "approved/published"
+    }
+
     const logs = await prisma.operationLog.findMany({
+      where,
       include: {
         guard: true,
         mapPin: {
