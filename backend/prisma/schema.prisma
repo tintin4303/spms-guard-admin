@@ -25,6 +25,7 @@ model User {
   image         String?
   password      String?
   role          Role      @default(CLIENT)
+  createdAt     DateTime  @default(now())
   accounts      Account[]
   sessions      Session[]
   

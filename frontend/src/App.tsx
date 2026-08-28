@@ -324,7 +324,9 @@ function AdminUserManagement() {
  <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{u.name}</td>
  <td className="px-6 py-4 text-[14px] text-gray-600">{u.role}</td>
  <td className="px-6 py-4 text-[14px] text-gray-500">{u.email}</td>
- <td className="px-6 py-4 text-[14px] text-gray-400">System Genesis</td>
+ <td className="px-6 py-4 text-[14px] text-gray-400">
+ {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'System Genesis'}
+ </td>
  <td className="px-6 py-4">
  <button onClick={()=>handleDelete(u.id)} className="text-[13px] text-red-500 hover:underline">Revoke Access</button>
  </td>
