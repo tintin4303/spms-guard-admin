@@ -30,16 +30,25 @@ router.post('/register', async (req, res) => {
     else if(email.toLowerCase().includes('agency') || email.toLowerCase().includes('manager')) targetRole = 'AGENCY_MANAGER';
     else if(email.toLowerCase().includes('ops')) targetRole = 'OPERATION_MANAGER';
 
+    let agencyOptions: any = {};
+    if (targetRole === 'AGENCY_MANAGER') {
+       const newAgency = await prisma.agency.create({
+         data: { name: 'Vendor ' + email.split('@')[0], contact: email }
+       });
+       agencyOptions = { managedAgencyId: newAgency.id };
+    }
+
     const user = await prisma.user.create({
       data: {
         email,
         name: name || email.split('@')[0],
         password: hashedPassword,
         role: targetRole as any,
+        ...agencyOptions
       },
     });
 
-    const token = jwt.sign({ userId: user.id, role: user.role, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, role: user.role, email: user.email, managedAgencyId: user.managedAgencyId }, JWT_SECRET, {
       expiresIn: '7d',
     });
 
@@ -68,13 +77,31 @@ router.post('/login', async (req, res) => {
         else if(email.toLowerCase().includes('agency') || email.toLowerCase().includes('manager')) targetRole = 'AGENCY_MANAGER';
         else if(email.toLowerCase().includes('ops')) targetRole = 'OPERATION_MANAGER';
         
+        let agencyOptions: any = {};
+        if (targetRole === 'AGENCY_MANAGER') {
+           const newAgency = await prisma.agency.create({
+             data: { name: 'Vendor ' + email.split('@')[0], contact: email }
+           });
+           agencyOptions = { managedAgencyId: newAgency.id };
+        }
+        
         user = await prisma.user.create({
             data: {
                email,
                name: email.split('@')[0],
                password: await bcrypt.hash('1234', 10),
-               role: targetRole as any
+               role: targetRole as any,
+               ...agencyOptions
             }
+        });
+    } else if (user && user.role === 'AGENCY_MANAGER' && !user.managedAgencyId) {
+        // Patches existing Agency Managers that lack an agency
+        const newAgency = await prisma.agency.create({
+            data: { name: 'Vendor ' + user.email!.split('@')[0], contact: user.email }
+        });
+        user = await prisma.user.update({
+            where: { id: user.id },
+            data: { managedAgencyId: newAgency.id }
         });
     }
 
@@ -91,11 +118,11 @@ router.post('/login', async (req, res) => {
         }
     }
 
-    const token = jwt.sign({ userId: user.id, role: user.role, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, role: user.role, email: user.email, managedAgencyId: user.managedAgencyId }, JWT_SECRET, {
       expiresIn: '7d',
     });
 
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, managedAgencyId: user.managedAgencyId } });
   } catch(e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Login failed' });

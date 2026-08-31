@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, BarChart, Calendar, Search } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, BarChart as BarChartIcon, Calendar, Search, Download } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import * as XLSX from 'xlsx';
 import DashboardLayout from './components/DashboardLayout';
 import AdminLayout from './components/AdminLayout';
 import ClientLayout from './components/ClientLayout';
 import AgencyLayout from './components/AgencyLayout';
 import MapControl from './components/MapControl';
-import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, fetchLogs, fetchAnalytics, createRoster, deleteRoster, createException } from './api';
+import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, fetchLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident } from './api';
 
 function Login({ onLogin }: { onLogin: (u: any) => void }) {
   const [email, setEmail] = useState('');
@@ -94,7 +96,7 @@ function Overview({ role }: { role: string }) {
   const [stats, setStats] = useState<any>(null);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   useEffect(() => {
-    fetchAnalytics().then(setStats).catch(console.error);
+    fetchReportsOverview().then(setStats).catch(console.error);
     fetchLogs().then((res: any) => setRecentLogs(res.slice(0, 3))).catch(console.error);
   }, []);
 
@@ -728,6 +730,7 @@ function Guards() {
               <tr className="bg-[#F8FAFC]">
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Guard ID</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Name</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Agency</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Certification</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Shift Preference</th>
@@ -737,13 +740,20 @@ function Guards() {
             <tbody>
               {guards.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No guards found in roster.</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No guards found in roster.</td>
                 </tr>
               ) : (
                 paginatedGuards.map((g) => (
                   <tr key={g.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
                     <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
+                    <td className="px-6 py-4">
+                      {g.source === 'AGENCY' ? (
+                        <span className="text-[12px] font-medium text-purple-700 bg-purple-100 px-2 py-1 rounded">{g.agency?.name || 'Agency'}</span>
+                      ) : (
+                        <span className="text-[12px] font-medium text-blue-700 bg-blue-100 px-2 py-1 rounded">In-House</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-[14px] text-[#475569]">
                       <div>{g.certificateNumber || 'N/A'}</div>
                       {g.certificationExpiry && new Date(g.certificationExpiry) < new Date() && (
@@ -867,15 +877,14 @@ function Guards() {
   );
 }
 
-function Schedules() {
+function Schedules({ role }: { role?: string }) {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [guards, setGuards] = useState<any[]>([]);
-  const [, _setIsAssigning] = useState(false);
-  const [, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isCreatingRoster, setIsCreatingRoster] = useState(false);
   const [isCreatingException, setIsCreatingException] = useState(false);
   const [siteFilter, setSiteFilter] = useState('All Sites');
+  const [contracts, setContracts] = useState<any[]>([]);
 
   const defaultFormData = {
     date: new Date().toISOString().split('T')[0],
@@ -889,31 +898,52 @@ function Schedules() {
   };
   const [formData, setFormData] = useState(defaultFormData);
   const [errorMsg, setErrorMsg] = useState('');
-  const [, setWarningMsg] = useState('');
 
   const loadSchedules = () => {
+    // If a site is selected, we could pass it to fetchSchedules, but we can also just filter client-side.
+    // We already fetch all restricted schedules on backend.
     fetchSchedules().then(setSchedules).catch(console.error);
   };
 
-  const [contracts, setContracts] = useState<any[]>([]);
-
   useEffect(() => {
     loadSchedules();
-    fetchGuards().then(setGuards).catch(console.error);
-    fetchContracts().then(setContracts).catch(console.error);
-  }, []);
-
-  // Extract all available sites from active contracts for the dropdown
-  const uniqueSites = contracts.reduce((acc: any[], curr) => {
-    if (curr.sites && curr.sites.length > 0) {
-      curr.sites.forEach((site: any) => {
-        if (!acc.find((s: any) => s.id === site.id)) {
-          acc.push({ id: site.id, name: site.name });
-        }
-      });
+    if (role === 'OPERATION_MANAGER' || !role) {
+      fetchGuards().then(setGuards).catch(console.error);
+      fetchContracts().then(setContracts).catch(console.error);
     }
-    return acc;
-  }, []);
+  }, [role]);
+
+  // Extract available sites from schedules so it works for all roles without full contracts access
+  const uniqueSites = Array.from(
+    new Map(
+      schedules.filter(s => s.site).map(s => [s.site.id, s.site])
+    ).values()
+  ) as any[];
+
+  // Full global sites extracted straight from contracts for Ops deployment menu
+  const allGlobalSites = useMemo(() => {
+    const arr: any[] = [];
+    contracts.forEach(c => {
+      if (c.sites) c.sites.forEach((s: any) => arr.push({ ...s, clientName: c.clientCompanyName }));
+    });
+    return arr;
+  }, [contracts]);
+
+  const isOps = role === 'OPERATION_MANAGER' || !role;
+
+  const formatGuardName = (g: any) => {
+    if (!g) return 'Unassigned';
+    if (role === 'CLIENT') return `${g.firstName || 'Unknown'} ${g.lastName?.[0] || '?'}.`;
+    return `${g.firstName || ''} ${g.lastName || ''}`.trim() || 'Unknown Guard';
+  };
+
+  const formatSiteName = (s: any) => {
+     if (!s) return 'Unknown Site';
+     if (isOps && s.contract?.clientCompanyName) {
+       return `${s.contract.clientCompanyName} - ${s.name}`;
+     }
+     return s.name;
+  };
 
   const openCreateRoster = () => {
     setFormData(defaultFormData);
@@ -995,7 +1025,7 @@ function Schedules() {
     }
   };
 
-  const filteredSchedules = schedules.filter(s => siteFilter === 'All Sites' || s.site?.name === siteFilter);
+  const filteredSchedules = schedules.filter(s => siteFilter === 'All Sites' || s.site?.id === siteFilter);
 
   return (
     <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
@@ -1011,7 +1041,7 @@ function Schedules() {
             className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-gray-600 outline-none focus:border-[#1E3A5F]"
           >
             <option value="All Sites">All Sites</option>
-            {uniqueSites.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
+            {uniqueSites.map((s: any) => <option key={s.id} value={s.id}>{formatSiteName(s)}</option>)}
           </select>
           <div className="flex bg-gray-200 p-1 rounded">
             <button
@@ -1027,9 +1057,11 @@ function Schedules() {
               List
             </button>
           </div>
-          <button onClick={openCreateRoster} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
-            + Assign Permanent Post
-          </button>
+          {isOps && (
+            <button onClick={openCreateRoster} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
+              + Assign Permanent Post
+            </button>
+          )}
         </div>
       </div>
 
@@ -1042,13 +1074,13 @@ function Schedules() {
                 <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Contract Site</th>
                 <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Assigned Guard</th>
                 <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Actions</th>
+                {isOps && <th className="px-6 py-4 text-[12px] font-semibold text-[#6B7280] uppercase tracking-wider">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {filteredSchedules.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-500">No shift schedules found.</td>
+                  <td colSpan={isOps ? 5 : 4} className="px-6 py-8 text-center text-[13px] text-gray-500">No shift schedules found.</td>
                 </tr>
               ) : (
                 filteredSchedules.map(sched => (
@@ -1056,19 +1088,22 @@ function Schedules() {
                     <td className="px-6 py-4">
                       <p className="text-[14px] font-medium text-[#0F172A]">{sched.shiftLabel}</p>
                     </td>
-                    <td className="px-6 py-4 text-[14px] text-[#475569]">{sched.site?.name} ({sched.site?.contract?.clientCompanyName})</td>
-                    <td className="px-6 py-4 text-[14px] text-[#475569]">{sched.guard?.guardId} ({sched.guard?.firstName} {sched.guard?.lastName})</td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">{formatSiteName(sched.site)}</td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">{role === 'CLIENT' ? 'ID HIDDEN' : sched.guard?.guardId} ({formatGuardName(sched.guard)})</td>
                     <td className="px-6 py-4">
                       <span className={`text-[14px] ${sched.status === 'Pending Reassignment' ? 'text-orange-600' : 'text-green-700'}`}>
                         {sched.status || 'Scheduled'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 flex gap-2">
-                      {sched.status?.includes('Permanent') && (
-                        <button onClick={() => handleDeleteRoster(sched.rosterId)} className="text-[13px] text-red-600 hover:underline">Delete Post</button>
-                      )}<button onClick={() => openCreateException(sched)} className="text-[13px] text-blue-600 hover:underline">Override</button>
-                      <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
-                    </td>
+                    {isOps && (
+                      <td className="px-6 py-4 flex gap-2">
+                        {sched.status?.includes('Permanent') && (
+                          <button onClick={() => handleDeleteRoster(sched.rosterId)} className="text-[13px] text-red-600 hover:underline">Delete Post</button>
+                        )}
+                        <button onClick={() => openCreateException(sched)} className="text-[13px] text-blue-600 hover:underline">Override</button>
+                        <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -1096,7 +1131,7 @@ function Schedules() {
                   </div>
                   <div className={`p-2 flex flex-col gap-2 ${isToday ? 'bg-slate-50 min-h-[calc(100%-36px)]' : ''}`}>
                     {daySchedules.length === 0 ? <div className="text-gray-400 text-center mt-4 text-[12px]">No Shifts</div> : daySchedules.map(sched => (
-                      <div key={sched.id} className={`border p-2 rounded group cursor-pointer transition-colors ${sched.status?.includes('Absent') ? 'bg-red-50 border-red-200 hover:bg-red-100' : (sched.status?.includes('Swap') ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' : 'bg-blue-50 border-blue-100 hover:bg-blue-100')}`} onClick={() => openCreateException(sched)}>
+                      <div key={sched.id} onClick={() => { if (isOps) openCreateException(sched); }} className={`border p-2 rounded group ${isOps ? 'cursor-pointer' : ''} transition-colors ${sched.status?.includes('Absent') ? 'bg-red-50 border-red-200 hover:bg-red-100' : (sched.status?.includes('Swap') ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' : 'bg-blue-50 border-blue-100 hover:bg-blue-100')}`}>
                         <div className="flex justify-between items-start">
                           <p className="font-bold text-[#1E3A5F] text-[12px]">
                             {sched.startTime} - {sched.endTime}
@@ -1104,8 +1139,8 @@ function Schedules() {
                           {sched.status?.includes('Swap') && <span className="text-[9px] bg-orange-200 text-orange-800 px-1 rounded">SWAP</span>}
                           {sched.status?.includes('Absent') && <span className="text-[9px] bg-red-200 text-red-800 px-1 rounded">ABSENT</span>}
                         </div>
-                        <p className="text-gray-600 truncate text-[11px] mt-1">{sched.guard?.firstName} {sched.guard?.lastName}</p>
-                        <p className="text-gray-500 truncate text-[11px]">{sched.site?.name}</p>
+                        <p className="text-gray-600 truncate text-[11px] mt-1">{formatGuardName(sched.guard)}</p>
+                        <p className="text-gray-500 truncate text-[11px]">{formatSiteName(sched.site)}</p>
                       </div>
                     ))}
                   </div>
@@ -1126,26 +1161,43 @@ function Schedules() {
             <div className="p-6 space-y-4">
               {errorMsg && <div className="text-red-600 text-sm font-medium">{errorMsg}</div>}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Start Time</label>
-                  <input type="time" required value={formData.startTime} onChange={e => setFormData({ ...formData, startTime: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 mb-1">End Time</label>
-                  <input type="time" required value={formData.endTime} onChange={e => setFormData({ ...formData, endTime: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-1">Site</label>
-                <select value={formData.siteId} onChange={e => setFormData({ ...formData, siteId: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" required>
+                <select value={formData.siteId} onChange={e => {
+                   const site = allGlobalSites.find(s => s.id === e.target.value);
+                   const firstShift = site?.shiftTimings?.[0];
+                   setFormData({ 
+                     ...formData, 
+                     siteId: e.target.value,
+                     startTime: firstShift ? firstShift.split(' - ')[0] : '08:00',
+                     endTime: firstShift ? firstShift.split(' - ')[1] : '20:00'
+                   });
+                }} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" required>
                   <option value="">Select a Site</option>
-                  {uniqueSites.map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                  {allGlobalSites.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.clientName} - {s.name}</option>
                   ))}
                 </select>
               </div>
+
+              {formData.siteId && (
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Select Shift Cycle</label>
+                  <select 
+                    value={`${formData.startTime} - ${formData.endTime}`} 
+                    onChange={e => {
+                      const [start, end] = e.target.value.split(' - ');
+                      setFormData({ ...formData, startTime: start, endTime: end });
+                    }} 
+                    className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none bg-blue-50/50" 
+                    required
+                  >
+                    {allGlobalSites.find((s: any) => s.id === formData.siteId)?.shiftTimings?.map((timing: string, idx: number) => (
+                      <option key={idx} value={timing}>Shift {idx + 1} ({timing})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-1">Guard</label>
@@ -1210,10 +1262,31 @@ function Logs({ role }: { role?: string }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [siteFilter, setSiteFilter] = useState('All Sites');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [isResolving, setIsResolving] = useState<any>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const loadLogs = () => fetchLogs().then(setLogs).catch(console.error);
 
   useEffect(() => {
-    fetchLogs().then(setLogs).catch(console.error);
+    loadLogs();
   }, []);
+
+  const handleResolveSubmit = async (e: any) => {
+    e.preventDefault();
+    setErrorMsg('');
+    try {
+      await resolveIncident(isResolving.id, resolutionNote);
+      setIsResolving(null);
+      setResolutionNote('');
+      loadLogs();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to resolve incident.');
+    }
+  };
+
+  const isOps = role === 'OPERATION_MANAGER' || !role;
 
   const uniqueSites = Array.from(new Set(logs.map(log => log.mapPin?.patrolPath?.site?.name).filter(Boolean)));
 
@@ -1261,6 +1334,7 @@ function Logs({ role }: { role?: string }) {
               <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Type</th>
               <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Description</th>
               <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Personnel</th>
+              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status / Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1286,87 +1360,228 @@ function Logs({ role }: { role?: string }) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-[13px] text-gray-700 font-medium">{log.guard ? `${log.guard.firstName} ${log.guard.lastName}` : 'System'}</td>
+                  <td className="px-6 py-4">
+                    {log.resolved ? (
+                      <div>
+                        <span className="text-[13px] text-green-700 font-medium flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Resolved</span>
+                        {log.resolutionNote && <p className="text-[11px] text-gray-500 mt-1 max-w-[200px] truncate" title={log.resolutionNote}>Note: {log.resolutionNote}</p>}
+                      </div>
+                    ) : (
+                      log.isIncident ? (
+                        isOps ? <button onClick={() => setIsResolving(log)} className="text-[12px] bg-blue-50 text-blue-600 px-3 py-1 rounded font-medium hover:bg-blue-100 border border-blue-200">Resolve</button> : <span className="text-[13px] text-orange-600 font-medium">Unresolved</span>
+                      ) : (
+                        <span className="text-[13px] text-gray-400">N/A</span>
+                      )
+                    )}
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {isResolving && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleResolveSubmit} className="bg-white rounded-lg shadow-xl w-[500px] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b bg-[#F8FAFC]">
+              <h3 className="text-lg font-semibold text-[#1E3A5F]">Resolve Incident</h3>
+              <p className="text-[13px] text-gray-500 mt-1">Log resolution details for incident reported at {new Date(isResolving.timestamp).toLocaleString()}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {errorMsg && <div className="text-red-600 text-sm font-medium">{errorMsg}</div>}
+              <div className="p-3 bg-red-50 border border-red-100 rounded">
+                <p className="text-[13px] text-gray-800"><span className="font-semibold">Guard:</span> {isResolving.guard ? `${isResolving.guard.firstName} ${isResolving.guard.lastName}` : 'System'}</p>
+                <p className="text-[13px] text-gray-800 mt-1"><span className="font-semibold">Description:</span> {isResolving.description || 'None'}</p>
+              </div>
+              
+              <div>
+                <label className="block text-[13px] font-medium text-gray-700 mb-2">Resolution Note & Actions Taken</label>
+                <textarea 
+                  required 
+                  value={resolutionNote} 
+                  onChange={e => setResolutionNote(e.target.value)} 
+                  rows={4} 
+                  className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:border-blue-500 resize-none" 
+                  placeholder="Detail how this incident was resolved or why it is being dismissed..." 
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
+              <button type="button" onClick={() => { setIsResolving(null); setResolutionNote(''); }} className="px-4 py-2 border rounded text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
+              <button type="submit" className="bg-blue-600 px-4 py-2 text-white text-[13px] font-medium rounded hover:bg-blue-700">Mark as Resolved</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
 
-function Reports() {
+function Reports({ role }: { role?: string }) {
   const [stats, setStats] = useState<any>(null);
+  const [guards, setGuards] = useState<any[]>([]);
+
+  const formatGuardName = (g: any) => {
+    if (role === 'CLIENT') return `${g.firstName || 'Unknown'} ${g.lastName?.[0] || '?'}.`;
+    return `${g.firstName || ''} ${g.lastName || ''}`.trim() || 'Unknown Guard';
+  };
+
   useEffect(() => {
-    fetchAnalytics().then(setStats).catch(console.error);
+    fetchReportsOverview().then(setStats).catch(console.error);
+    fetchGuardPerformance().then(setGuards).catch(console.error);
   }, []);
+
+  const chartData = useMemo(() => {
+    if (!stats?.incidentFrequency) return [];
+    return Object.keys(stats.incidentFrequency).map(site => ({
+      name: site,
+      incidents: stats.incidentFrequency[site]
+    }));
+  }, [stats]);
+
+  const exportReport = () => {
+    const ws = XLSX.utils.json_to_sheet(guards.map(g => ({
+      'Guard ID': role === 'CLIENT' ? 'HIDDEN' : g.guardId,
+      'Name': formatGuardName(g),
+      'Agency': g.agency?.name || 'In-House',
+      'Status': g.status,
+      'Incident Count': g.incidentCount,
+      'Utilization %': g.utilization
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Guard_Performance");
+    XLSX.writeFile(wb, "SPMS_Performance_Report.xlsx");
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-[24px] font-bold text-[#1E3A5F]">Performance Reports</h2>
-        <p className="text-[14px] text-[#6B7280] mt-1">Key operational metrics and SLA compliance.</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-[24px] font-bold text-[#1E3A5F]">Performance Analytics</h2>
+          <p className="text-[14px] text-[#6B7280] mt-1">Live metrics, incident frequency, and guard duty evaluations.</p>
+        </div>
+        <button onClick={exportReport} className="flex items-center gap-2 bg-[#1E3A5F] px-4 py-2 text-[13px] text-white font-medium rounded hover:bg-[#162D4A] transition-colors">
+          <Download className="w-4 h-4" /> Export XLSX
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Guards Deployed', val: stats?.guardsOnDuty || 0, desc: `Out of ${stats?.totalGuardsCount || 0} registered` },
+          { label: 'Active Service Contracts', val: stats?.activeContracts || 0, desc: 'Currently managed' },
+          { label: 'Pending Security Alerts', val: stats?.pendingAlerts || 0, desc: 'Unresolved incidents' },
+          { label: 'SLA Fulfillment Rate', val: `${stats?.contractFulfillment || 0}%`, desc: 'Average across all sites' }
+        ].map((kpi, idx) => (
+          <div key={idx} className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-4">
+            <h3 className="text-[13px] font-bold text-[#6B7280] mb-1">{kpi.label}</h3>
+            <span className="text-[28px] font-bold text-[#0F172A] leading-tight">{kpi.val}</span>
+            <p className="text-[11px] text-gray-400 mt-2">{kpi.desc}</p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
-          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-4">Guard Attendance Rate</h3>
-          <div className="flex items-end gap-2 mb-2">
-            <span className="text-[32px] font-bold text-[#0F172A] leading-none">{stats?.attendanceRate || 0}%</span>
-            <span className="text-[13px] text-gray-600 font-medium mb-1">↑ 1.2%</span>
-          </div>
-          <p className="text-[13px] text-gray-500 mb-6">Across all active contracts this month.</p>
-
-          <div className="w-full bg-gray-100 rounded-full h-2">
-            <div className="bg-[#1E3A5F] h-2 rounded-full" style={{ width: `${stats?.attendanceRate || 0}%` }}></div>
-          </div>
+          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-6">Incident Frequency By Site</h3>
+          {chartData.length > 0 ? (
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 12 }} />
+                  <Bar dataKey="incidents" fill="#1E3A5F" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center text-[13px] text-gray-400">No incident data available for the last 30 days.</div>
+          )}
         </div>
 
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
-          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-4">Contract Fulfillment</h3>
-          <div className="flex items-end gap-2 mb-2">
-            <span className="text-[32px] font-bold text-[#0F172A] leading-none">{stats?.contractFulfillment || 0}%</span>
-            <span className="text-[13px] text-gray-400 font-medium mb-1">-</span>
-          </div>
-          <p className="text-[13px] text-gray-500 mb-6">All requested shifts have been fully staffed.</p>
-
-          <div className="w-full bg-gray-100 rounded-full h-2">
-            <div className="bg-[#1E3A5F] h-2 rounded-full" style={{ width: `${stats?.contractFulfillment || 0}%` }}></div>
+        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
+          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-6">Incident Resolution Performance</h3>
+          <div className="flex-1 flex flex-col justify-center gap-6">
+            <div>
+              <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1.5">
+                <span>Critical Incidents (Goal: &lt; 15m)</span>
+                <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.critical || 0}</span> mins avg</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.critical || 0) / 30) * 100, 100)}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1.5">
+                <span>Warnings & Violations (Goal: &lt; 60m)</span>
+                <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.warning || 0}</span> mins avg</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.warning || 0) / 120) * 100, 100)}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1.5">
+                <span>Routine Anomalies (Goal: &lt; 24h)</span>
+                <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.routine || 0}</span> mins avg</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-[#1E3A5F] h-2 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.routine || 0) / 1440) * 100, 100)}%` }}></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
-        <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-4">Incident Resolution Time</h3>
-        <div className="flex flex-col gap-4">
-          <div>
-            <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1">
-              <span>Critical Incidents</span>
-              <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.critical || 0}</span> mins</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5">
-              <div className="bg-[#1E3A5F] h-1.5 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.critical || 0) / 60) * 100, 100)}%` }}></div>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1">
-              <span>Warning / Elevated</span>
-              <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.warning || 0}</span> mins</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5">
-              <div className="bg-[#475569] h-1.5 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.warning || 0) / 60) * 100, 100)}%` }}></div>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1">
-              <span>Routine / Info</span>
-              <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.routine || 0}</span> mins</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5">
-              <div className="bg-[#94A3B8] h-1.5 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.routine || 0) / 120) * 100, 100)}%` }}></div>
-            </div>
-          </div>
+      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+          <h3 className="text-[14px] font-bold text-[#1E3A5F]">Guard Performance Log</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white border-b border-[#E2E8F0]">
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase">Guard</th>
+                {role === 'OPERATION_MANAGER' && <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase">Affiliation</th>}
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase">Status</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase text-center">Lifetime Incidents</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase text-right">Duty Utilization</th>
+              </tr>
+            </thead>
+            <tbody>
+              {guards.map(g => (
+                <tr key={g.id} className="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                  <td className="px-6 py-4">
+                    <p className="font-medium text-[13px] text-[#0F172A]">{formatGuardName(g)}</p>
+                    <p className="text-[11px] text-gray-400">ID: {role === 'CLIENT' ? 'HIDDEN' : g.guardId}</p>
+                  </td>
+                  {role === 'OPERATION_MANAGER' && (
+                    <td className="px-6 py-4 text-[13px] text-gray-600">
+                      {g.agency?.name || 'In-House'}
+                    </td>
+                  )}
+                  <td className="px-6 py-4">
+                    <span className={`text-[12px] px-2 py-0.5 rounded-full font-medium ${g.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                      {g.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center text-[13px] font-medium text-[#1E3A5F]">
+                    {g.incidentCount}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="text-[13px] font-medium text-gray-700">{g.utilization}%</span>
+                  </td>
+                </tr>
+              ))}
+              {guards.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-400">No guard data available in current scope.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1461,63 +1676,232 @@ function SettingsOps() {
   )
 }
 
-function ClientReports() {
+export function ClientReports() {
   return <Reports />;
 }
 
-function AgencyGuards() {
+export function AgencyGuards() {
   const [guards, setGuards] = useState<any[]>([]);
-  useEffect(() => {
-    // Ideally pass agencyId but for prototype we just use fetchGuards
-    fetchGuards().then(setGuards).catch(console.error);
-  }, []);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const defaultFormData = {
+    firstName: '',
+    lastName: '',
+    guardId: `GRD-`,
+    certificateNumber: '',
+    shiftPreference: 'Flexible',
+    status: 'Active',
+    contactNumber: '',
+    certificationExpiry: '',
+    skills: [] as string[]
+  };
+  const [formData, setFormData] = useState(defaultFormData);
+
+  const loadGuards = () => fetchGuards().then(setGuards).catch(console.error);
+  useEffect(() => { loadGuards(); }, []);
+
+  const handleToggle = async (id: string, current: boolean) => {
+    try {
+      await toggleGuardVisibility(id, !current);
+      loadGuards();
+    } catch (e) { console.error(e); }
+  };
+
+  const openCreate = () => {
+    setEditingId(null);
+    setFormData({ ...defaultFormData, guardId: `GRD-${Math.floor(Math.random() * 10000)}` });
+    setIsCreating(true);
+  };
+  
+  const openEdit = (g: any) => {
+    setEditingId(g.id);
+    setFormData({
+      firstName: g.firstName || '',
+      lastName: g.lastName || '',
+      guardId: g.guardId || '',
+      certificateNumber: g.certificateNumber || '',
+      shiftPreference: g.shiftPreference || 'Flexible',
+      status: g.status || 'Active',
+      contactNumber: g.contactNumber || '',
+      certificationExpiry: g.certificationExpiry ? g.certificationExpiry.split('T')[0] : '',
+      skills: g.skills ? (Array.isArray(g.skills) ? g.skills : []) : [],
+    });
+    setIsCreating(true);
+  };
+  
+  const handleDelete = async (id: string) => {
+    if (!confirm("Remove this guard from agency?")) return;
+    try { await deleteGuard(id); loadGuards(); } catch (e) { console.error(e); }
+  };
+  
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    const dataToSend = {
+      ...formData,
+      skills: formData.skills.length > 0 ? formData.skills : null,
+      certificationExpiry: formData.certificationExpiry ? new Date(formData.certificationExpiry).toISOString() : null
+    };
+    try {
+      if (editingId) await updateGuard(editingId, dataToSend);
+      else await createGuard(dataToSend);
+      setIsCreating(false);
+      loadGuards();
+    } catch (err) { alert("Error saving guard."); }
+  };
 
   return (
-    <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
-      <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
-        <div>
-          <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Agency Roster</h2>
-          <p className="text-[13px] text-gray-500">View guards assigned to your agency.</p>
+    <>
+      <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
+          <div>
+            <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Agency Roster</h2>
+            <p className="text-[13px] text-gray-500">Manage guards under your agency and toggle their availability for Ops.</p>
+          </div>
+          <button onClick={openCreate} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
+            + Add Guard
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#F8FAFC]">
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Guard ID</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Name</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Available to Ops?</th>
+                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {guards.length === 0 ? (
+                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-[13px]">No guards assigned to your agency yet.</td></tr>
+              ) : (
+                guards.map(g => (
+                  <tr key={g.id} className="hover:bg-[#F8FAFC]">
+                    <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
+                    <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
+                    <td className="px-6 py-4 text-[14px] text-[#475569]">{g.status}</td>
+                    <td className="px-6 py-4">
+                      <label className="flex items-center cursor-pointer">
+                        <div className="relative">
+                          <input type="checkbox" className="sr-only" checked={g.isVisibleToOps || false} onChange={() => handleToggle(g.id, g.isVisibleToOps || false)} />
+                          <div className={`block w-10 h-6 rounded-full transition ${g.isVisibleToOps ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                          <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform ${g.isVisibleToOps ? 'translate-x-4' : ''}`}></div>
+                        </div>
+                      </label>
+                    </td>
+                    <td className="px-6 py-4 flex gap-2">
+                       <button onClick={() => openEdit(g)} className="text-[13px] text-blue-600 hover:underline">Edit</button>
+                       <button onClick={() => handleDelete(g.id)} className="text-[13px] text-red-600 hover:underline">Remove</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[#F8FAFC]">
-              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Guard ID</th>
-              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Name</th>
-              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Certification</th>
-              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status</th>
-              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Shift Preference</th>
-            </tr>
-          </thead>
-          <tbody>
-            {guards.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-[13px]">No guards assigned to your agency yet.</td></tr>
-            ) : (
-              guards.map(g => (
-                <tr key={g.id} className="hover:bg-[#F8FAFC]">
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
-                  <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
-                  <td className="px-6 py-4 text-[14px] text-[#475569]">
-                    <div>{g.certificateNumber || 'N/A'}</div>
-                    {g.certificationExpiry && new Date(g.certificationExpiry) < new Date() && (
-                      <div className="text-[12px] text-red-600 font-medium">Expired</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-[14px] text-[#475569]">{g.status}</td>
-                  <td className="px-6 py-4 text-[14px] text-[#475569] font-medium">{g.shiftPreference || 'Flexible'}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+
+      {isCreating && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-[500px] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b bg-[#F8FAFC] flex justify-between">
+              <h3 className="text-lg font-semibold text-[#1E3A5F]">Agency Guard Form</h3>
+              <button type="button" onClick={() => setIsCreating(false)} className="text-gray-500 hover:text-black">✖</button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">First Name</label>
+                  <input required value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Last Name</label>
+                  <input required value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Generated ID</label>
+                  <input disabled value={formData.guardId} className="w-full border rounded px-3 py-2 text-[14px] bg-gray-100 text-gray-500" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Certificate # (Optional)</label>
+                  <input value={formData.certificateNumber} onChange={e => setFormData({ ...formData, certificateNumber: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-medium text-gray-700 mb-1">Shift Preferences</label>
+                <select value={formData.shiftPreference} onChange={e => setFormData({ ...formData, shiftPreference: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]">
+                  <option value="Flexible">Flexible</option>
+                  <option value="Day">Day Shifts Only</option>
+                  <option value="Night">Night Shifts Only</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Status</label>
+                  <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]">
+                    <option value="Active">Active</option>
+                    <option value="On Leave">On Leave</option>
+                    <option value="Suspended">Suspended</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Contact Number</label>
+                  <input value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Cert Expiry Date</label>
+                  <input type="date" value={formData.certificationExpiry} onChange={e => setFormData({ ...formData, certificationExpiry: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-[#1E3A5F]" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Skills (Press Enter)</label>
+                  <div className="w-full border rounded px-2 py-1.5 focus-within:ring-1 focus-within:ring-[#1E3A5F] flex flex-wrap gap-1.5 items-center bg-white text-[14px]">
+                    {formData.skills.map((s: string) => (
+                      <span key={s} className="bg-blue-100 text-[#1E3A5F] font-medium text-[12px] px-2 py-0.5 rounded flex items-center gap-1 leading-none shadow-sm">
+                        {s}
+                        <button type="button" onClick={() => setFormData({ ...formData, skills: formData.skills.filter((sk: string) => sk !== s) })} className="text-blue-500 hover:text-red-500 outline-none leading-none pt-0.5">&times;</button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      placeholder={formData.skills.length === 0 ? "e.g. Armed" : ""}
+                      className="flex-1 min-w-[50px] outline-none border-none p-0 focus:ring-0 text-[13px] h-[24px]"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val && !formData.skills.includes(val)) {
+                            setFormData({ ...formData, skills: [...formData.skills, val] });
+                          }
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+              <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 text-[14px] text-gray-600">Cancel</button>
+              <button type="submit" className="ml-2 bg-[#1E3A5F] text-white px-4 py-2 rounded text-[14px]">Save Guard</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
-function AgencySchedules() {
+export function AgencySchedules() {
   const [schedules, setSchedules] = useState<any[]>([]);
   useEffect(() => {
     fetchSchedules().then(setSchedules).catch(console.error);
@@ -1606,24 +1990,26 @@ export default function App() {
           <p className="text-[13px] text-gray-500">View the certified personnel assigned to your properties.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#F8FAFC]">
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Guard ID</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Name</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Certifications</th>
                 <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status</th>
               </tr>
             </thead>
             <tbody>
-              {guards.map(g => (
-                <tr key={g.id} className="hover:bg-[#F8FAFC] border-t border-gray-100">
-                  <td className="px-6 py-4 text-[14px] text-[#1E3A5F] font-medium">{g.guardId}</td>
-                  <td className="px-6 py-4 text-[14px]">{g.firstName} {g.lastName}</td>
-                  <td className="px-6 py-4 text-[14px]">{g.skills?.join(', ') || 'Standard Security Training'}</td>
-                  <td className="px-6 py-4 text-[14px] text-green-700">{g.status}</td>
-                </tr>
-              ))}
+              {guards.length === 0 ? (
+                <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500 text-[13px]">No guards assigned to your properties.</td></tr>
+              ) : (
+                guards.map(g => (
+                  <tr key={g.id} className="hover:bg-[#F8FAFC] border-t border-gray-100">
+                    <td className="px-6 py-4 text-[14px] text-gray-500 font-medium italic">ID HIDDEN</td>
+                    <td className="px-6 py-4 text-[14px]">{g.firstName} {g.lastName?.[0] || '?'}.</td>
+                    <td className="px-6 py-4 text-[14px] text-green-700">{g.status}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1703,8 +2089,10 @@ export default function App() {
 
         {/* Agency Sphere */}
         <Route path="/agency" element={<ProtectedRoute allowed={['AGENCY_MANAGER']} role={user?.role}><AgencyLayout user={user} onLogout={handleLogout} /></ProtectedRoute>}>
-          <Route index element={<div className="text-gray-500 p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">Agency Roster integration pending.</div>} />
-          <Route path="schedules" element={<div className="p-6">Schedule integration pending</div>} />
+          <Route index element={<AgencyGuards />} />
+          <Route path="schedules" element={<Schedules role={user?.role} />} />
+          <Route path="logs" element={<Logs role={user?.role} />} />
+          <Route path="reports" element={<Reports role={user?.role} />} />
         </Route>
 
         {/* Ops Sphere */}
@@ -1712,9 +2100,9 @@ export default function App() {
           <Route index element={<Overview role={user?.role} />} />
           <Route path="contracts" element={<Contracts />} />
           <Route path="guards" element={<Guards />} />
-          <Route path="schedules" element={<Schedules />} />
+          <Route path="schedules" element={<Schedules role={user?.role} />} />
           <Route path="logs" element={<Logs role={user?.role} />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="reports" element={<Reports role={user?.role} />} />
           <Route path="requests" element={<ServiceRequests />} />
           <Route path="settings" element={<SettingsOps />} />
           <Route path="*" element={<div>Page under construction</div>} />
@@ -1728,7 +2116,8 @@ export default function App() {
         <Route path="/client" element={<ProtectedRoute allowed={['CLIENT']} role={user?.role}><ClientLayout user={user} onLogout={handleLogout} /></ProtectedRoute>}>
           <Route index element={<ClientContracts />} />
           <Route path="guards" element={<ClientGuards />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="schedules" element={<Schedules role={user?.role} />} />
+          <Route path="reports" element={<Reports role={user?.role} />} />
           <Route path="settings" element={<SettingsOps />} />
           <Route path="*" element={<div>Client Module under construction</div>} />
         </Route>

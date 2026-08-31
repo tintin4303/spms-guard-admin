@@ -4,6 +4,7 @@ import { Briefcase, BarChart2, Settings, LogOut, CheckCircle2 } from 'lucide-rea
 const clientNav = [
   { href: '/client', icon: Briefcase, label: 'My Contracts' },
   { href: '/client/guards', icon: Briefcase, label: 'Assigned Guards' },
+  { href: '/client/schedules', icon: Briefcase, label: 'Schedules' },
   { href: '/client/reports', icon: BarChart2, label: 'Analytics & Reports' },
   { href: '/client/settings', icon: Settings, label: 'Account Settings' },
 ];

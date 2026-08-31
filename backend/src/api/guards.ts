@@ -14,19 +14,41 @@ router.get('/', async (req, res) => {
       try { user = jwt.verify(token, JWT_SECRET); } catch (e) { }
     }
 
-    const where = user?.role === 'CLIENT' ? {
-      rosters: {
-        some: {
-          site: {
-            contract: {
-              clientId: user.userId
-            }
-          }
-        }
-      }
-    } : {};
+    let where: any = {};
+    if (user?.role === 'CLIENT') {
+      where = {
+        rosters: { some: { site: { contract: { clientId: user.userId } } } }
+      };
+    } else if (user?.role === 'AGENCY_MANAGER') {
+      if (!user.managedAgencyId) return res.json([]);
+      where = { agencyId: user.managedAgencyId };
+    } else if (user?.role === 'OPERATION_MANAGER') {
+      where = {
+        OR: [
+          { source: 'IN_HOUSE' },
+          { source: 'AGENCY', isVisibleToOps: true }
+        ]
+      };
+    }
 
-    const guards = await prisma.guard.findMany({ where });
+    // When returning to client, strip sensitive info, but here we can just query all and pick what we send back or leave stripping to the frontend (though backend stripping is safer).
+    // Let's strip in the response map if CLIENT.
+    const guards = await prisma.guard.findMany({
+      where,
+      include: { agency: { select: { name: true } } }
+    });
+
+    if (user?.role === 'CLIENT') {
+      const strippedGuards = guards.map(g => ({
+        id: g.id,
+        guardId: g.guardId,
+        firstName: g.firstName,
+        lastName: g.lastName ? g.lastName.charAt(0) + '.' : '',
+        status: g.status,
+      }));
+      return res.json(strippedGuards);
+    }
+
     res.json(guards);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch guards' });
@@ -35,7 +57,22 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const token = req.headers.authorization?.split(' ')[1];
+    let user: any = null;
+    if (token) {
+      try { user = jwt.verify(token, JWT_SECRET); } catch (e) { }
+    }
+
     const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills } = req.body;
+    
+    let source = "IN_HOUSE";
+    let agencyId = null;
+    
+    if (user?.role === 'AGENCY_MANAGER') {
+      source = "AGENCY";
+      agencyId = user.managedAgencyId;
+    }
+
     const guard = await prisma.guard.create({
       data: {
         firstName,
@@ -46,7 +83,9 @@ router.post('/', async (req, res) => {
         status: status || 'Active',
         contactNumber,
         certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : undefined,
-        skills: skills ? JSON.stringify(skills) : undefined
+        skills: skills ? JSON.stringify(skills) : undefined,
+        source,
+        agencyId
       }
     });
     res.json(guard);
@@ -90,6 +129,22 @@ router.put('/:id', async (req, res) => {
         certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : undefined,
         skills: skills ? JSON.stringify(skills) : undefined
       }
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update guard' });
+  }
+});
+
+router.put('/:id/visibility', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isVisibleToOps } = req.body;
+
+    const updated = await prisma.guard.update({
+      where: { id },
+      data: { isVisibleToOps }
     });
     res.json(updated);
   } catch (err) {

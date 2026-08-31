@@ -42,8 +42,10 @@ export const fetchGuards = async () => {
   return response.json();
 };
 
-export const fetchContracts = async () => {
-  const response = await fetch(`${API_BASE_URL}/contracts`, { headers: getAuthHeaders() });
+export const fetchContracts = async (clientId?: string) => {
+  let url = `${API_BASE_URL}/contracts`;
+  if (clientId) url += `?clientId=${clientId}`;
+  const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch contracts');
   return response.json();
 };
@@ -51,7 +53,7 @@ export const fetchContracts = async () => {
 export const createGuard = async (data: any) => {
   const response = await fetch(`${API_BASE_URL}/guards`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to create guard');
@@ -61,10 +63,20 @@ export const createGuard = async (data: any) => {
 export const updateGuard = async (id: string, data: any) => {
   const response = await fetch(`${API_BASE_URL}/guards/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to update guard');
+  return response.json();
+};
+
+export const toggleGuardVisibility = async (id: string, isVisibleToOps: boolean) => {
+  const response = await fetch(`${API_BASE_URL}/guards/${id}/visibility`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ isVisibleToOps }),
+  });
+  if (!response.ok) throw new Error('Failed to update guard visibility');
   return response.json();
 };
 
@@ -161,8 +173,9 @@ export const deletePatrolPath = async (id: string) => {
   return res.json();
 };
 
-export const fetchSchedules = async () => {
-  const response = await fetch(`${API_BASE_URL}/schedules`, { headers: getAuthHeaders() });
+export const fetchSchedules = async (siteId?: string) => {
+  const url = siteId ? `${API_BASE_URL}/schedules?siteId=${siteId}` : `${API_BASE_URL}/schedules`;
+  const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch schedules');
   return response.json();
 };
@@ -199,9 +212,25 @@ export const fetchLogs = async () => {
   return response.json();
 };
 
-export const fetchAnalytics = async () => {
-  const response = await fetch(`${API_BASE_URL}/analytics/overview`);
-  if (!response.ok) throw new Error('Failed to fetch analytics');
+export const resolveIncident = async (logId: string, resolutionNote: string) => {
+  const response = await fetch(`${API_BASE_URL}/logs/${logId}/resolve`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ resolutionNote }),
+  });
+  if (!response.ok) throw new Error('Failed to resolve incident');
+  return response.json();
+};
+
+export const fetchReportsOverview = async () => {
+  const response = await fetch(`${API_BASE_URL}/reports/overview`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch reports overview');
+  return response.json();
+};
+
+export const fetchGuardPerformance = async () => {
+  const response = await fetch(`${API_BASE_URL}/reports/guards`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch guard reports');
   return response.json();
 };
 

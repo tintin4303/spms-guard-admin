@@ -8,6 +8,7 @@ import {
   BookOpen,
   BarChart2,
   LogOut,
+  Settings
 } from 'lucide-react';
 
 const navItems = [
