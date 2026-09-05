@@ -1,16 +1,36 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
 router.get('/', async (req, res) => {
   try {
-    const { agencyId } = req.query;
-    const guardWhere = agencyId ? { agencyId: String(agencyId) } : {};
+    const token = req.headers.authorization?.split(' ')[1];
+    let user: any = null;
+    if (token) {
+      try { user = jwt.verify(token, JWT_SECRET); } catch (e) { }
+    }
+
+    const { siteId, agencyId } = req.query;
+    
+    let guardWhere: any = agencyId ? { agencyId: String(agencyId) } : {};
+    let siteWhere: any = siteId ? { id: String(siteId) } : {};
+
+    if (user?.role === 'AGENCY_MANAGER') {
+       guardWhere = { ...guardWhere, agencyId: user.managedAgencyId };
+    }
+    if (user?.role === 'CLIENT') {
+       siteWhere = { ...siteWhere, contract: { clientId: user.userId } };
+    }
 
     const rosters = await prisma.siteRoster.findMany({
-      where: { guard: guardWhere },
+      where: { 
+        guard: guardWhere,
+        site: { ...siteWhere }
+      },
       include: {
         guard: true,
         site: {

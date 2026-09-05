@@ -40,12 +40,21 @@ router.post('/', requireRole(['ADMIN']), async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    let agencyOptions: any = {};
+    if (role === 'AGENCY_MANAGER') {
+       const newAgency = await prisma.agency.create({
+         data: { name: name || ('Vendor ' + email.split('@')[0]), contact: email }
+       });
+       agencyOptions = { managedAgencyId: newAgency.id };
+    }
+
     const user = await prisma.user.create({
       data: { 
         email, 
         name, 
         role,
-        password: hashedPassword 
+        password: hashedPassword,
+        ...agencyOptions
       },
       select: { id: true, name: true, email: true, role: true }
     });
@@ -60,7 +69,7 @@ router.post('/', requireRole(['ADMIN']), async (req, res) => {
 router.delete('/:id', requireRole(['ADMIN']), async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.user.delete({ where: { id } });
+    await prisma.user.delete({ where: { id: String(id) } });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete user account' });

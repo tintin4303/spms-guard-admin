@@ -15,6 +15,7 @@ enum Role {
   OPERATION_MANAGER
   CLIENT
   AGENCY_MANAGER
+  GUARD
 }
 
 model User {
@@ -34,6 +35,8 @@ model User {
   agency          Agency? @relation(fields: [managedAgencyId], references: [id])
   
   managedContracts Contract[] // Contracts the Client owns
+  
+  resolvedLogs    OperationLog[] @relation("ResolverLogs")
 }
 
 // NextAuth standard models (Accounts, Sessions, VerificationTokens typically go here)
@@ -86,6 +89,9 @@ model Guard {
   contactNumber      String?
   certificationExpiry DateTime?
   skills             Json?    // Array of custom skills
+  
+  isVisibleToOps     Boolean  @default(false) // Agency toggle: make guard available for Ops deployment
+  source             String   @default("IN_HOUSE") // "IN_HOUSE" or "AGENCY"
   
   agencyId           String? // Null if an in-house guard
   agency             Agency? @relation(fields: [agencyId], references: [id])
@@ -188,6 +194,10 @@ model OperationLog {
   isIncident  Boolean  @default(false) // Flags if this log is an incident report
   description String?
   resolved    Boolean  @default(false) // Operation Manager can mark incident as resolved
+  resolvedAt       DateTime?
+  resolvedById     String?
+  resolvedBy       User?    @relation("ResolverLogs", fields: [resolvedById], references: [id])
+  resolutionNote   String?
   
   guardId     String
   guard       Guard @relation(fields: [guardId], references: [id])

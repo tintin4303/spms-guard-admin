@@ -1,0 +1,77 @@
+﻿diff --git a/backend/src/api/guards.ts b/backend/src/api/guards.ts
+index 1369e34..6d3eb9d 100644
+--- a/backend/src/api/guards.ts
++++ b/backend/src/api/guards.ts
+@@ -1,12 +1,32 @@
+ import { Router } from 'express';
+ import { PrismaClient } from '@prisma/client';
++import jwt from 'jsonwebtoken';
+ 
+ const router = Router();
+ const prisma = new PrismaClient();
++const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
+ 
+ router.get('/', async (req, res) => {
+   try {
+-    const guards = await prisma.guard.findMany();
++    const token = req.headers.authorization?.split(' ')[1];
++    let user: any = null;
++    if (token) {
++      try { user = jwt.verify(token, JWT_SECRET); } catch (e) {}
++    }
++
++    const where = user?.role === 'CLIENT' ? {
++      rosters: {
++        some: {
++          site: {
++            contract: {
++              clientId: user.userId
++            }
++          }
++        }
++      }
++    } : {};
++
++    const guards = await prisma.guard.findMany({ where });
+     res.json(guards);
+   } catch (err) {
+     res.status(500).json({ error: 'Failed to fetch guards' });
+@@ -25,8 +45,8 @@ router.post('/', async (req, res) => {
+         shiftPreference,
+         status: status || 'Active',
+         contactNumber,
+-        certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : null,
+-        skills: skills ? JSON.stringify(skills) : null
++        certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : undefined,
++        skills: skills ? JSON.stringify(skills) : undefined
+       }
+     });
+     res.json(guard);
+@@ -41,6 +61,8 @@ router.put('/:id', async (req, res) => {
+     const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills } = req.body;
+     
+     // If status is changed to "On Leave", we need to flag upcoming assignments for reassignment
++    // NOTE: GuardAssignment doesn't exist in the current schema. You'd need to log a ShiftException.
++    /*
+     if (status === 'On Leave') {
+        await prisma.guardAssignment.updateMany({
+          where: {
+@@ -53,6 +75,7 @@ router.put('/:id', async (req, res) => {
+          }
+        });
+     }
++    */
+     
+     const updated = await prisma.guard.update({
+       where: { id },
+@@ -64,8 +87,8 @@ router.put('/:id', async (req, res) => {
+         shiftPreference,
+         status,
+         contactNumber,
+-        certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : null,
+-        skills: skills ? JSON.stringify(skills) : null
++        certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : undefined,
++        skills: skills ? JSON.stringify(skills) : undefined
+       }
+     });
+     res.json(updated);
