@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
-import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, BarChart as BarChartIcon, Calendar, Search, Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Calendar, Search, Download } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import DashboardLayout from './components/DashboardLayout';
 import AdminLayout from './components/AdminLayout';
