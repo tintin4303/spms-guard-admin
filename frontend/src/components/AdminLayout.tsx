@@ -3,6 +3,7 @@ import { LogOut, Shield } from 'lucide-react';
 
 const adminNav = [
  { href: '/admin', icon: Shield, label: 'User Registry' },
+ { href: '/admin/guards', icon: Shield, label: 'Guard Provisioning' },
 ];
 
 export default function AdminLayout({ user, onLogout }: { user: any, onLogout: () => void }) {

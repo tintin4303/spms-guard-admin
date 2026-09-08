@@ -42,6 +42,16 @@ export const fetchGuards = async () => {
   return response.json();
 };
 
+export const provisionGuardAccount = async (id: string, data: any) => {
+  const response = await fetch(`${API_BASE_URL}/guards/${id}/provision`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) throw new Error('Failed to provision guard account');
+  return response.json();
+};
+
 export const fetchContracts = async (clientId?: string) => {
   let url = `${API_BASE_URL}/contracts`;
   if (clientId) url += `?clientId=${clientId}`;
@@ -231,6 +241,48 @@ export const fetchReportsOverview = async () => {
 export const fetchGuardPerformance = async () => {
   const response = await fetch(`${API_BASE_URL}/reports/guards`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch guard reports');
+  return response.json();
+};
+
+export const fetchGuardMetrics = async () => {
+  const response = await fetch(`${API_BASE_URL}/guard/metrics`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch guard metrics');
+  return response.json();
+};
+
+export const fetchGuardShifts = async () => {
+  const response = await fetch(`${API_BASE_URL}/guard/shifts`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch guard shifts');
+  return response.json();
+};
+
+export const checkinShiftPin = async (rosterId: string, mapPinId: string, description: string) => {
+  const response = await fetch(`${API_BASE_URL}/guard/shifts/${rosterId}/checkin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ mapPinId, description }),
+  });
+  if (!response.ok) throw new Error('Failed to check in');
+  return response.json();
+};
+
+export const completeShift = async (rosterId: string, notes: string) => {
+  const response = await fetch(`${API_BASE_URL}/guard/shifts/${rosterId}/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ notes }),
+  });
+  if (!response.ok) throw new Error('Failed to complete shift');
+  return response.json();
+};
+
+export const reportGuardIncident = async (data: { mapPinId?: string, rosterId?: string, description: string }) => {
+  const response = await fetch(`${API_BASE_URL}/guard/incidents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to report incident');
   return response.json();
 };
 
