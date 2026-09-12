@@ -20,14 +20,14 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-import authRouter from './api/auth';
-import guardsRouter from './api/guards';
-import contractsRouter from './api/contracts';
-import mapRouter from './api/map';
-import usersRouter from './api/users';
-import schedulesRouter from './api/schedules';
-import logsRouter from './api/logs';
-import reportsRouter from './api/reports';
+import authRouter from './auth/auth.routes';
+import guardsRouter from './guards/guards.routes';
+import contractsRouter from './contracts/contracts.routes';
+import mapRouter from './map/map.routes';
+import usersRouter from './users/users.routes';
+import schedulesRouter from './schedules/schedules.routes';
+import logsRouter from './logs/logs.routes';
+import reportsRouter from './reports/reports.routes';
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

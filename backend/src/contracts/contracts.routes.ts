@@ -1,0 +1,138 @@
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+
+import jwt from 'jsonwebtoken';
+
+const router = Router();
+const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
+
+router.get('/', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    let user: any = null;
+    if (token) {
+      try { user = jwt.verify(token, JWT_SECRET); } catch (e) { }
+    }
+    const where = user?.role === 'CLIENT' ? { clientId: user.userId } : {};
+
+    const contracts = await prisma.contract.findMany({
+      where,
+      include: { sites: true, client: true }
+    });
+    res.json(contracts);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load contracts' });
+  }
+});
+
+router.post('/', async (req, res) => {
+  try {
+    const { clientCompanyName, contactInfo, durationMonths, clientId, startDate, endDate, sites, contractDate, scopeOfWork, liabilities, penalties, damages, terminationTerms, contractFileUrl } = req.body;
+
+    // Safety check against hardcoded frontend clientId
+    let validClientId = String(clientId || 'dummy-client-id');
+    const clientExists = await prisma.user.findUnique({ where: { id: validClientId } });
+    if (!clientExists) {
+      const fallbackClient = await prisma.user.findFirst({ where: { role: 'CLIENT' } });
+      validClientId = fallbackClient ? fallbackClient.id : (await prisma.user.create({ data: { name: 'Auto Client', email: `auto_${Date.now()}@test.com`, role: 'CLIENT' } })).id;
+    }
+
+    const newContract = await prisma.contract.create({
+      data: {
+        clientCompanyName,
+        contactInfo,
+        durationMonths,
+        clientId: validClientId,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        contractDate: contractDate ? new Date(contractDate) : null,
+        scopeOfWork,
+        liabilities,
+        penalties,
+        damages,
+        terminationTerms,
+        contractFileUrl,
+        sites: {
+          create: sites && sites.length > 0
+            ? sites.map((s: any) => ({
+              name: s.name || s,
+              shiftCount: s.shiftCount || 2,
+              shiftTimings: s.shiftTimings || [],
+              address: s.address,
+              siteType: s.siteType,
+              accessInstructions: s.accessInstructions,
+              knownHazards: s.knownHazards,
+              guardsPerShift: s.guardsPerShift ? parseInt(s.guardsPerShift) : 1,
+              guardQualifications: s.guardQualifications
+            }))
+            : [{ name: 'Default Site' }]
+        }
+      },
+      include: { sites: true, client: true }
+    });
+    res.json(newContract);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create contract' });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clientCompanyName, contactInfo, durationMonths, startDate, endDate, sites, contractDate, scopeOfWork, liabilities, penalties, damages, terminationTerms, contractFileUrl } = req.body;
+
+    // Nuke existing sites to cleanly override with the new updated structure
+    await prisma.site.deleteMany({ where: { contractId: id } });
+
+    const updated = await prisma.contract.update({
+      where: { id },
+      data: {
+        clientCompanyName,
+        contactInfo,
+        durationMonths,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        contractDate: contractDate ? new Date(contractDate) : null,
+        scopeOfWork,
+        liabilities,
+        penalties,
+        damages,
+        terminationTerms,
+        contractFileUrl,
+        sites: {
+          create: sites && sites.length > 0
+            ? sites.map((s: any) => ({
+              name: s.name || s,
+              shiftCount: s.shiftCount || 2,
+              shiftTimings: s.shiftTimings || [],
+              address: s.address,
+              siteType: s.siteType,
+              accessInstructions: s.accessInstructions,
+              knownHazards: s.knownHazards,
+              guardsPerShift: s.guardsPerShift ? parseInt(s.guardsPerShift) : 1,
+              guardQualifications: s.guardQualifications
+            }))
+            : [{ name: 'Default Site' }]
+        }
+      },
+      include: { sites: true, client: true }
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update contract' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    await prisma.contract.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete' });
+  }
+});
+
+export default router;

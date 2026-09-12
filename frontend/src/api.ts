@@ -53,7 +53,7 @@ export const fetchContracts = async (clientId?: string) => {
 export const createGuard = async (data: any) => {
   const response = await fetch(`${API_BASE_URL}/guards`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to create guard');
@@ -63,7 +63,7 @@ export const createGuard = async (data: any) => {
 export const updateGuard = async (id: string, data: any) => {
   const response = await fetch(`${API_BASE_URL}/guards/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to update guard');
@@ -73,7 +73,7 @@ export const updateGuard = async (id: string, data: any) => {
 export const toggleGuardVisibility = async (id: string, isVisibleToOps: boolean) => {
   const response = await fetch(`${API_BASE_URL}/guards/${id}/visibility`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ isVisibleToOps }),
   });
   if (!response.ok) throw new Error('Failed to update guard visibility');
@@ -215,7 +215,7 @@ export const fetchLogs = async () => {
 export const resolveIncident = async (logId: string, resolutionNote: string) => {
   const response = await fetch(`${API_BASE_URL}/logs/${logId}/resolve`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ resolutionNote }),
   });
   if (!response.ok) throw new Error('Failed to resolve incident');

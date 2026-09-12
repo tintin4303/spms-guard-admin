@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
-import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, BarChart as BarChartIcon, Calendar, Search, Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Calendar, Search, Download } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import DashboardLayout from './components/DashboardLayout';
 import AdminLayout from './components/AdminLayout';
@@ -70,7 +70,7 @@ function Login({ onLogin }: { onLogin: (u: any) => void }) {
               <span className=" mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all">agency@spms.com</span>
             </li>
           </ul>
-          <p className="text-[11px] text-gray-500 mt-6">(Use any dummy password. The system strictly detects the security role permissions upon handshaking.)</p>
+          <p className="text-[11px] text-gray-500 mt-6">(The password is 1234)</p>
         </div>
       </div>
     </div>
@@ -276,19 +276,66 @@ function AdminUserManagement() {
   const paginatedUsers = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('CLIENT');
+
+  // Client Specific Fields
+  const [clientType, setClientType] = useState('นิติบุคคล');
+  const [taxId, setTaxId] = useState('');
+  const [registeredNameTh, setRegisteredNameTh] = useState('');
+  const [registeredNameEn, setRegisteredNameEn] = useState('');
+  const [address, setAddress] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [phone, setPhone] = useState('');
+  const [lineId, setLineId] = useState('');
 
   const loadUsers = () => fetchUsers().then(setUsers).catch(console.error);
   useEffect(() => { loadUsers(); }, []);
 
   const handleCreate = async (e: any) => {
     e.preventDefault();
-    await createUser({ email, name, role, password });
-    setIsCreating(false);
-    loadUsers();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const data: any = { email, name, role, password };
+      if (role === 'CLIENT') {
+        data.clientType = clientType;
+        data.taxId = taxId;
+        data.registeredNameTh = registeredNameTh;
+        data.registeredNameEn = registeredNameEn;
+        data.address = address;
+        data.contactPerson = contactPerson;
+        data.phone = phone;
+        data.lineId = lineId;
+      }
+      await createUser(data);
+
+      // Reset form on success
+      setEmail('');
+      setName('');
+      setPassword('');
+      setRole('CLIENT');
+      setClientType('นิติบุคคล');
+      setTaxId('');
+      setRegisteredNameTh('');
+      setRegisteredNameEn('');
+      setAddress('');
+      setContactPerson('');
+      setPhone('');
+      setLineId('');
+
+      setIsCreating(false);
+      loadUsers();
+    } catch (err: any) {
+      alert("Failed to provision account (potentially duplicate email)");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -340,11 +387,11 @@ function AdminUserManagement() {
 
       {isCreating && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleCreate} className="bg-white rounded shadow-xl w-[450px]">
-            <div className="p-6 border-b">
+          <form onSubmit={handleCreate} className="bg-white rounded-lg shadow-xl w-[500px] flex flex-col overflow-hidden max-h-[85vh]">
+            <div className="p-6 border-b shrink-0">
               <h3 className="text-lg font-bold text-[#0F172A]">Provision Account</h3>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
               <div>
                 <label className="block text-[13px] font-medium mb-1">Full Name</label>
                 <input required value={name} onChange={e => setName(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
@@ -366,10 +413,63 @@ function AdminUserManagement() {
                   <option value="ADMIN">System Admin</option>
                 </select>
               </div>
+
+              {role === 'CLIENT' && (
+                <div className="pt-4 border-t mt-4">
+                  <h4 className="text-[14px] font-semibold text-[#1E3A5F] mb-3">Client & Company Identity</h4>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[13px] font-medium mb-1">Client Type</label>
+                        <select value={clientType} onChange={e => setClientType(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]">
+                          <option value="นิติบุคคล">นิติบุคคล (Corporate)</option>
+                          <option value="บุคคลธรรมดา">บุคคลธรรมดา (Individual)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[13px] font-medium mb-1">Tax ID (13 หลัก)</label>
+                        <input value={taxId} onChange={e => setTaxId(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[13px] font-medium mb-1">Registered Name (Thai)</label>
+                        <input value={registeredNameTh} onChange={e => setRegisteredNameTh(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                      </div>
+                      <div>
+                        <label className="block text-[13px] font-medium mb-1">Registered Name (English)</label>
+                        <input value={registeredNameEn} onChange={e => setRegisteredNameEn(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-medium mb-1">Full Address</label>
+                      <input value={address} onChange={e => setAddress(e.target.value)} placeholder="เลขที่/หมู่/ซอย/ถนน, ตำบล, อำเภอ, จังหวัด, รหัสไปรษณีย์" className="w-full border rounded px-3 py-2 text-[14px]" />
+                    </div>
+
+                    <h4 className="text-[14px] font-semibold text-[#1E3A5F] mb-3 mt-4 pt-4 border-t">Contact Info</h4>
+                    <div>
+                      <label className="block text-[13px] font-medium mb-1">Primary Contact Person & Role</label>
+                      <input value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[13px] font-medium mb-1">Phone Number</label>
+                        <input value={phone} onChange={e => setPhone(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                      </div>
+                      <div>
+                        <label className="block text-[13px] font-medium mb-1">LINE ID</label>
+                        <input value={lineId} onChange={e => setLineId(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="p-6 bg-gray-50 border-t flex justify-end gap-2">
+            <div className="p-6 bg-gray-50 border-t flex justify-end gap-2 shrink-0">
               <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 border rounded font-medium text-[13px]">Cancel</button>
-              <button type="submit" className="px-4 py-2 bg-red-600 text-white font-medium text-[13px] rounded hover:bg-red-700">Provision Resource</button>
+              <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-red-600 text-white font-medium text-[13px] rounded hover:bg-red-700 disabled:opacity-50">
+                {isSubmitting ? 'Provisioning...' : 'Provision Resource'}
+              </button>
             </div>
           </form>
         </div>
@@ -397,7 +497,14 @@ function Contracts() {
     clientId: '',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-    sites: [{ name: 'Corporate Campus', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'] }]
+    contractDate: new Date().toISOString().split('T')[0],
+    scopeOfWork: '',
+    liabilities: '',
+    penalties: '',
+    damages: '',
+    terminationTerms: '',
+    contractFileUrl: '',
+    sites: [{ name: 'Corporate Campus', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'], address: '', siteType: 'Warehouse', accessInstructions: '', knownHazards: '', guardsPerShift: 1, guardQualifications: '' }]
   };
 
   const [formData, setFormData] = useState(defaultFormData);
@@ -425,11 +532,24 @@ function Contracts() {
       clientId: c.clientId,
       startDate: new Date(c.startDate).toISOString().split('T')[0],
       endDate: new Date(c.endDate).toISOString().split('T')[0],
+      contractDate: c.contractDate ? new Date(c.contractDate).toISOString().split('T')[0] : '',
+      scopeOfWork: c.scopeOfWork || '',
+      liabilities: c.liabilities || '',
+      penalties: c.penalties || '',
+      damages: c.damages || '',
+      terminationTerms: c.terminationTerms || '',
+      contractFileUrl: c.contractFileUrl || '',
       sites: c.sites?.length > 0 ? c.sites.map((s: any) => ({
         name: s.name,
         shiftCount: s.shiftCount,
         baseStartTime: s.shiftTimings?.[0]?.split(' - ')[0] || '08:00',
-        shiftTimings: s.shiftTimings || []
+        shiftTimings: s.shiftTimings || [],
+        address: s.address || '',
+        siteType: s.siteType || '',
+        accessInstructions: s.accessInstructions || '',
+        knownHazards: s.knownHazards || '',
+        guardsPerShift: s.guardsPerShift || 1,
+        guardQualifications: s.guardQualifications || ''
       })) : defaultFormData.sites
     });
     setIsCreating(true);
@@ -536,13 +656,13 @@ function Contracts() {
 
       {isCreating && (
         <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-[600px] overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b bg-[#F8FAFC]">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-[600px] flex flex-col overflow-hidden max-h-[85vh]">
+            <div className="px-6 py-4 border-b bg-[#F8FAFC] shrink-0">
               <h3 className="text-lg font-semibold text-[#1E3A5F]">{editingId ? 'Edit Contract' : 'Provision New Contract'}</h3>
               <p className="text-[13px] text-gray-500 mt-1">Configure client scope, geographical sites, and shift structures.</p>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-5">
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-1">Client Entity</label>
                 <select
@@ -573,6 +693,40 @@ function Contracts() {
                 </div>
               </div>
 
+              <div className="pt-4 border-t">
+                <h4 className="text-[14px] font-semibold text-[#1E3A5F] mb-3">Service Scope & Terms</h4>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Contract Execution Date</label>
+                    <input type="date" value={formData.contractDate} onChange={e => setFormData({ ...formData, contractDate: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px]" />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Scope of Work</label>
+                    <input value={formData.scopeOfWork} onChange={e => setFormData({ ...formData, scopeOfWork: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px]" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Liabilities</label>
+                    <input value={formData.liabilities} onChange={e => setFormData({ ...formData, liabilities: e.target.value })} placeholder="Responsibilities..." className="w-full border rounded px-3 py-2 text-[14px]" />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Penalties (Default fines)</label>
+                    <input value={formData.penalties} onChange={e => setFormData({ ...formData, penalties: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px]" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Damages & Compensation</label>
+                    <input value={formData.damages} onChange={e => setFormData({ ...formData, damages: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px]" />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Termination Conditions</label>
+                    <input value={formData.terminationTerms} onChange={e => setFormData({ ...formData, terminationTerms: e.target.value })} className="w-full border rounded px-3 py-2 text-[14px]" />
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-2 border-t">
                 <label className="block text-[15px] font-semibold text-[#1E3A5F] mb-1">Nested Patrol Sites & Shifts</label>
 
@@ -581,9 +735,49 @@ function Contracts() {
                     {formData.sites.length > 1 && (
                       <button type="button" onClick={() => setFormData({ ...formData, sites: formData.sites.filter((_, idx) => idx !== i) })} className="absolute top-3 right-3 text-[11px] px-2 py-1 border border-red-200 text-red-500 rounded bg-white hover:bg-red-50">Remove Site</button>
                     )}
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[12px] font-medium text-gray-700 mb-1">Site Name/Nickname</label>
+                        <input required value={site.name} onChange={e => updateSiteField(i, 'name', e.target.value)} placeholder="e.g. Headquarters" className="w-full border rounded px-3 py-1.5 text-[14px]" />
+                      </div>
+                      <div>
+                        <label className="block text-[12px] font-medium text-gray-700 mb-1">Site Type</label>
+                        <select value={site.siteType} onChange={e => updateSiteField(i, 'siteType', e.target.value)} className="w-full border rounded px-3 py-1.5 text-[14px]">
+                          <option value="Residential">Residential / Condo</option>
+                          <option value="Warehouse">Warehouse & Logistics</option>
+                          <option value="Retail">Retail & Commercial</option>
+                          <option value="Construction">Construction Site</option>
+                          <option value="Corporate">Corporate Office</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="mb-3">
-                      <label className="block text-[12px] font-medium text-gray-700 mb-1">Site Name</label>
-                      <input required value={site.name} onChange={e => updateSiteField(i, 'name', e.target.value)} placeholder="e.g. Headquarters" className="w-full border rounded px-3 py-1.5 text-[14px]" />
+                      <label className="block text-[12px] font-medium text-gray-700 mb-1">Full Address</label>
+                      <input value={site.address} onChange={e => updateSiteField(i, 'address', e.target.value)} className="w-full border rounded px-3 py-1.5 text-[14px] bg-white" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[12px] font-medium text-gray-700 mb-1">Guards Per Shift</label>
+                        <input type="number" min={1} value={site.guardsPerShift} onChange={e => updateSiteField(i, 'guardsPerShift', parseInt(e.target.value) || 1)} className="w-full border rounded px-3 py-1.5 text-[14px]" />
+                      </div>
+                      <div>
+                        <label className="block text-[12px] font-medium text-gray-700 mb-1">Required Qualifications</label>
+                        <input value={site.guardQualifications} onChange={e => updateSiteField(i, 'guardQualifications', e.target.value)} placeholder="Armed, First-aid, etc." className="w-full border rounded px-3 py-1.5 text-[14px]" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[12px] font-medium text-gray-700 mb-1">Access Instructions</label>
+                        <input value={site.accessInstructions} onChange={e => updateSiteField(i, 'accessInstructions', e.target.value)} placeholder="Gate codes, key pickup..." className="w-full border rounded px-3 py-1.5 text-[14px]" />
+                      </div>
+                      <div>
+                        <label className="block text-[12px] font-medium text-gray-700 mb-1">Known Hazards</label>
+                        <input value={site.knownHazards} onChange={e => updateSiteField(i, 'knownHazards', e.target.value)} placeholder="Blind spots, stray dogs..." className="w-full border rounded px-3 py-1.5 text-[14px]" />
+                      </div>
                     </div>
                     <div className="mb-3 flex gap-4">
                       <div className="flex-1">
@@ -614,11 +808,11 @@ function Contracts() {
                     </div>
                   </div>
                 ))}
-                <button type="button" onClick={() => setFormData({ ...formData, sites: [...formData.sites, { name: '', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'] }] })} className="text-[13px] text-[#1E3A5F] hover:underline font-medium">+ Add another physical site scope</button>
+                <button type="button" onClick={() => setFormData({ ...formData, sites: [...formData.sites, { name: '', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'], address: '', siteType: 'Corporate', accessInstructions: '', knownHazards: '', guardsPerShift: 1, guardQualifications: '' }] })} className="text-[13px] text-[#1E3A5F] hover:underline font-medium">+ Add another physical site scope</button>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 shrink-0">
               <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 border rounded text-[13px] font-medium text-gray-600 hover:bg-gray-100 bg-white">Cancel</button>
               <button type="submit" disabled={isSubmitting} className="bg-[#1E3A5F] px-4 py-2 text-white text-[13px] font-medium rounded hover:bg-[#162D4A] disabled:opacity-50">
                 {isSubmitting ? 'Processing...' : (editingId ? 'Save Edits' : 'Confirm Provisioning')}
@@ -938,11 +1132,11 @@ function Schedules({ role }: { role?: string }) {
   };
 
   const formatSiteName = (s: any) => {
-     if (!s) return 'Unknown Site';
-     if (isOps && s.contract?.clientCompanyName) {
-       return `${s.contract.clientCompanyName} - ${s.name}`;
-     }
-     return s.name;
+    if (!s) return 'Unknown Site';
+    if (isOps && s.contract?.clientCompanyName) {
+      return `${s.contract.clientCompanyName} - ${s.name}`;
+    }
+    return s.name;
   };
 
   const openCreateRoster = () => {
@@ -1164,14 +1358,14 @@ function Schedules({ role }: { role?: string }) {
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-1">Site</label>
                 <select value={formData.siteId} onChange={e => {
-                   const site = allGlobalSites.find(s => s.id === e.target.value);
-                   const firstShift = site?.shiftTimings?.[0];
-                   setFormData({ 
-                     ...formData, 
-                     siteId: e.target.value,
-                     startTime: firstShift ? firstShift.split(' - ')[0] : '08:00',
-                     endTime: firstShift ? firstShift.split(' - ')[1] : '20:00'
-                   });
+                  const site = allGlobalSites.find(s => s.id === e.target.value);
+                  const firstShift = site?.shiftTimings?.[0];
+                  setFormData({
+                    ...formData,
+                    siteId: e.target.value,
+                    startTime: firstShift ? firstShift.split(' - ')[0] : '08:00',
+                    endTime: firstShift ? firstShift.split(' - ')[1] : '20:00'
+                  });
                 }} className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none" required>
                   <option value="">Select a Site</option>
                   {allGlobalSites.map((s: any) => (
@@ -1183,13 +1377,13 @@ function Schedules({ role }: { role?: string }) {
               {formData.siteId && (
                 <div>
                   <label className="block text-[13px] font-medium text-gray-700 mb-1">Select Shift Cycle</label>
-                  <select 
-                    value={`${formData.startTime} - ${formData.endTime}`} 
+                  <select
+                    value={`${formData.startTime} - ${formData.endTime}`}
                     onChange={e => {
                       const [start, end] = e.target.value.split(' - ');
                       setFormData({ ...formData, startTime: start, endTime: end });
-                    }} 
-                    className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none bg-blue-50/50" 
+                    }}
+                    className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none bg-blue-50/50"
                     required
                   >
                     {allGlobalSites.find((s: any) => s.id === formData.siteId)?.shiftTimings?.map((timing: string, idx: number) => (
@@ -1262,7 +1456,7 @@ function Logs({ role }: { role?: string }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [siteFilter, setSiteFilter] = useState('All Sites');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const [isResolving, setIsResolving] = useState<any>(null);
   const [resolutionNote, setResolutionNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -1394,16 +1588,16 @@ function Logs({ role }: { role?: string }) {
                 <p className="text-[13px] text-gray-800"><span className="font-semibold">Guard:</span> {isResolving.guard ? `${isResolving.guard.firstName} ${isResolving.guard.lastName}` : 'System'}</p>
                 <p className="text-[13px] text-gray-800 mt-1"><span className="font-semibold">Description:</span> {isResolving.description || 'None'}</p>
               </div>
-              
+
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 mb-2">Resolution Note & Actions Taken</label>
-                <textarea 
-                  required 
-                  value={resolutionNote} 
-                  onChange={e => setResolutionNote(e.target.value)} 
-                  rows={4} 
-                  className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:border-blue-500 resize-none" 
-                  placeholder="Detail how this incident was resolved or why it is being dismissed..." 
+                <textarea
+                  required
+                  value={resolutionNote}
+                  onChange={e => setResolutionNote(e.target.value)}
+                  rows={4}
+                  className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:border-blue-500 resize-none"
+                  placeholder="Detail how this incident was resolved or why it is being dismissed..."
                 />
               </div>
             </div>
@@ -1713,7 +1907,7 @@ export function AgencyGuards() {
     setFormData({ ...defaultFormData, guardId: `GRD-${Math.floor(Math.random() * 10000)}` });
     setIsCreating(true);
   };
-  
+
   const openEdit = (g: any) => {
     setEditingId(g.id);
     setFormData({
@@ -1729,12 +1923,12 @@ export function AgencyGuards() {
     });
     setIsCreating(true);
   };
-  
+
   const handleDelete = async (id: string) => {
     if (!confirm("Remove this guard from agency?")) return;
     try { await deleteGuard(id); loadGuards(); } catch (e) { console.error(e); }
   };
-  
+
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     const dataToSend = {
@@ -1792,8 +1986,8 @@ export function AgencyGuards() {
                       </label>
                     </td>
                     <td className="px-6 py-4 flex gap-2">
-                       <button onClick={() => openEdit(g)} className="text-[13px] text-blue-600 hover:underline">Edit</button>
-                       <button onClick={() => handleDelete(g.id)} className="text-[13px] text-red-600 hover:underline">Remove</button>
+                      <button onClick={() => openEdit(g)} className="text-[13px] text-blue-600 hover:underline">Edit</button>
+                      <button onClick={() => handleDelete(g.id)} className="text-[13px] text-red-600 hover:underline">Remove</button>
                     </td>
                   </tr>
                 ))
@@ -2056,8 +2250,8 @@ export default function App() {
                   <td className="px-6 py-4 text-[13px] text-gray-500">{r.date}</td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${r.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                        r.status === 'Approved' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-600'
+                      r.status === 'Approved' ? 'bg-green-100 text-green-700' :
+                        'bg-gray-100 text-gray-600'
                       }`}>
                       {r.status}
                     </span>
@@ -2118,7 +2312,7 @@ export default function App() {
           <Route path="guards" element={<ClientGuards />} />
           <Route path="schedules" element={<Schedules role={user?.role} />} />
           <Route path="reports" element={<Reports role={user?.role} />} />
-          <Route path="settings" element={<SettingsOps />} />
+          <Route path="settings" element={<div className="p-6">Client Settings under construction</div>} />
           <Route path="*" element={<div>Client Module under construction</div>} />
         </Route>
       </Routes>
