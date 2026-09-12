@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -35,7 +36,8 @@ router.get('/', async (req, res) => {
     // Let's strip in the response map if CLIENT.
     const guards = await prisma.guard.findMany({
       where,
-      include: { agency: { select: { name: true } } }
+      include: { agency: { select: { name: true } }, user: { select: { id: true, email: true } } },
+      orderBy: { guardId: 'asc' }
     });
 
     if (user?.role === 'CLIENT') {
@@ -160,6 +162,37 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete guard' });
+  }
+});
+
+router.post('/:id/provision', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, password } = req.body;
+
+    const guard = await prisma.guard.findUnique({ where: { id } });
+    if (!guard) return res.status(404).json({ error: 'Guard not found' });
+    if (guard.userId) return res.status(400).json({ error: 'Guard already provisioned' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const name = `${guard.firstName} ${guard.lastName}`;
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+        role: 'GUARD',
+        guardProfile: {
+          connect: { id: guard.id }
+        }
+      }
+    });
+
+    res.json({ success: true, user: { id: user.id, email: user.email } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to provision guard' });
   }
 });
 

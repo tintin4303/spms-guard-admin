@@ -26,6 +26,7 @@ model User {
   image         String?
   password      String?
   role          Role      @default(CLIENT)
+  createdAt     DateTime  @default(now())
   accounts      Account[]
   sessions      Session[]
   
@@ -36,7 +37,8 @@ model User {
   managedContracts Contract[] // Contracts the Client owns
   
   resolvedLogs    OperationLog[] @relation("ResolverLogs")
-  clientProfile   ClientProfile? 
+  clientProfile   ClientProfile?
+  guardProfile    Guard?
 }
 
 model ClientProfile {
@@ -109,6 +111,9 @@ model Guard {
   
   agencyId           String? // Null if an in-house guard
   agency             Agency? @relation(fields: [agencyId], references: [id])
+
+  userId             String? @unique
+  user               User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   rosters            SiteRoster[]
   replacements       ShiftException[] @relation("ReplacementGuardRelation")
@@ -170,6 +175,8 @@ model SiteRoster {
   shiftLabel String // e.g. "Morning Shift"
   startTime  String   @default("08:00") // e.g., "08:00"
   endTime    String   @default("20:00") // e.g., "20:00"
+  date       DateTime?
+  status     String   @default("Scheduled") // "Scheduled", "Completed", etc.
   
   guardId    String
   guard      Guard @relation(fields: [guardId], references: [id])
@@ -178,6 +185,7 @@ model SiteRoster {
   site       Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   exceptions ShiftException[]
+  logs       OperationLog[]
 }
 
 model ShiftException {
@@ -235,4 +243,7 @@ model OperationLog {
   
   mapPinId    String
   mapPin      MapPin @relation(fields: [mapPinId], references: [id], onDelete: Cascade)
+
+  rosterId    String?
+  roster      SiteRoster? @relation(fields: [rosterId], references: [id], onDelete: Cascade)
 }

@@ -22,6 +22,7 @@ app.use(express.json());
 
 import authRouter from './auth/auth.routes';
 import guardsRouter from './guards/guards.routes';
+import guardPortalRouter from './api/guard';
 import contractsRouter from './contracts/contracts.routes';
 import mapRouter from './map/map.routes';
 import usersRouter from './users/users.routes';
@@ -35,6 +36,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/guards', guardsRouter);
+app.use('/api/guard', guardPortalRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/map', mapRouter);
 app.use('/api/users', usersRouter);
