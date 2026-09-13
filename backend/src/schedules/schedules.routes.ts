@@ -219,24 +219,12 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
 
     let allGuards = await (prisma as any).guard.findMany({
       where: {
-        OR: [
-          { status: { in: ['Active', 'ACTIVE', 'active', 'On Duty', 'ON_DUTY'] } },
-          { status: null }
-        ]
+        NOT: {
+          status: { in: ['On Leave', 'ON_LEAVE', 'Inactive', 'INACTIVE', 'Suspended', 'SUSPENDED'] }
+        }
       },
       include: { agency: true }
     });
-
-    if (allGuards.length === 0) {
-      allGuards = await (prisma as any).guard.findMany({
-        where: {
-          NOT: {
-            status: { in: ['On Leave', 'ON_LEAVE', 'Inactive', 'INACTIVE'] }
-          }
-        },
-        include: { agency: true }
-      });
-    }
 
     if (allGuards.length === 0) {
       allGuards = await (prisma as any).guard.findMany({
