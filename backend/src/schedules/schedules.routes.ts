@@ -376,7 +376,8 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
         timing: timingStr,
         shiftLabel: r.shiftLabel || timingStr,
         recommendedGuard: topGuard,
-        alternativeGuards: scoredGuards.slice(1, 5)
+        alternativeGuards: scoredGuards.slice(1, 5),
+        allScoredGuards: scoredGuards
       });
     }
 

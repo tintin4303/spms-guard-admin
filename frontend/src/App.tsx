@@ -2366,6 +2366,11 @@ function Schedules({ role }: { role?: string }) {
                   const chosenGuardId = selectedGuardMap[rec.rosterId] || rec.recommendedGuard?.guardId || '';
                   const topGuard = rec.recommendedGuard;
 
+                  // Find full guard details for chosen selection
+                  const selectedScoredGuard = rec.allScoredGuards?.find((sg: any) => sg.guardId === chosenGuardId) || 
+                    (topGuard?.guardId === chosenGuardId ? topGuard : null);
+                  const activeGuard = selectedScoredGuard || topGuard;
+
                   return (
                     <div 
                       key={rec.rosterId}
@@ -2387,20 +2392,21 @@ function Schedules({ role }: { role?: string }) {
                           </div>
 
                           {/* Recommended Guard Info & Rationale */}
-                          {topGuard ? (
+                          {activeGuard ? (
                             <div className="mt-2.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[13px] font-semibold text-slate-800">
-                                  System Recommendation: <span className="text-[#1E3A5F] font-bold">{topGuard.guardName}</span>
+                                  {chosenGuardId && chosenGuardId !== topGuard?.guardId ? 'Manual Selection: ' : 'System Recommendation: '}
+                                  <span className="text-[#1E3A5F] font-bold">{activeGuard.guardName}</span>
                                 </span>
                                 <span className="bg-slate-100 text-[#1E3A5F] text-[11px] font-bold px-2 py-0.5 rounded border border-slate-300">
-                                  {topGuard.matchScore}% Match Score
+                                  {activeGuard.matchScore}% Match Score
                                 </span>
                               </div>
 
                               {/* Rationale Badges */}
                               <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                                {topGuard.rationale?.map((rat: string, idx: number) => (
+                                {activeGuard.rationale?.map((rat: string, idx: number) => (
                                   <span key={idx} className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded font-medium border border-slate-200">
                                     [ {rat} ]
                                   </span>
@@ -2419,17 +2425,28 @@ function Schedules({ role }: { role?: string }) {
                         <select
                           value={chosenGuardId}
                           onChange={e => setSelectedGuardMap({ ...selectedGuardMap, [rec.rosterId]: e.target.value })}
-                          className="w-full border rounded px-2.5 py-1.5 text-[13px] bg-white border-gray-300 focus:outline-none focus:border-[#1E3A5F]"
+                          className="w-full border rounded px-2.5 py-1.5 text-[12px] bg-white border-gray-300 focus:outline-none focus:border-[#1E3A5F] font-medium"
                         >
                           <option value="">Select Guard...</option>
-                          {guards.map((g: any) => {
-                            const isRecommended = topGuard && g.id === topGuard.guardId;
-                            return (
-                              <option key={g.id} value={g.id}>
-                                {g.firstName} {g.lastName} ({g.guardId}){isRecommended ? ' (Recommended)' : ''}
-                              </option>
-                            );
-                          })}
+                          {rec.allScoredGuards && rec.allScoredGuards.length > 0 ? (
+                            rec.allScoredGuards.map((sg: any, index: number) => {
+                              const isRecommended = topGuard && sg.guardId === topGuard.guardId;
+                              return (
+                                <option key={sg.guardId} value={sg.guardId}>
+                                  #{index + 1} • {sg.guardName} ({sg.guardCode}) [{sg.matchScore}% Match]{isRecommended ? ' (Recommended)' : ''}
+                                </option>
+                              );
+                            })
+                          ) : (
+                            guards.map((g: any) => {
+                              const isRecommended = topGuard && g.id === topGuard.guardId;
+                              return (
+                                <option key={g.id} value={g.id}>
+                                  {g.firstName} {g.lastName} ({g.guardId}){isRecommended ? ' (Recommended)' : ''}
+                                </option>
+                              );
+                            })
+                          )}
                         </select>
                       </div>
                     </div>
