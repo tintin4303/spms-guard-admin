@@ -185,10 +185,22 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
     const end = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 86400000);
     end.setHours(23, 59, 59, 999);
 
+    const safeIsoDate = (d: any): string | null => {
+      if (!d) return null;
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return null;
+        return dt.toISOString().split('T')[0];
+      } catch {
+        return null;
+      }
+    };
+
     const where: any = {
       date: { gte: start, lte: end },
       OR: [
         { guardId: null },
+        { guardId: '' },
         { status: 'Unassigned' }
       ]
     };
@@ -246,32 +258,38 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
     existingAssignedRosters.forEach((r: any) => {
       if (r.guardId && r.date) {
         const gId = String(r.guardId);
-        const dateIso = new Date(r.date).toISOString().split('T')[0];
-        guardSimulatedShifts[gId] = (guardSimulatedShifts[gId] || 0) + 1;
-        guardDailyAssignments[`${gId}_${dateIso}`] = true;
+        const dateIso = safeIsoDate(r.date);
+        if (dateIso) {
+          guardSimulatedShifts[gId] = (guardSimulatedShifts[gId] || 0) + 1;
+          guardDailyAssignments[`${gId}_${dateIso}`] = true;
+        }
       }
     });
 
     const recommendations: any[] = [];
 
     for (const r of unassignedRosters) {
-      const dateIso = new Date(r.date).toISOString().split('T')[0];
+      const dateIso = safeIsoDate(r.date) || new Date().toISOString().split('T')[0];
       const startHour = parseInt((r.startTime || '08:00').split(':')[0], 10);
       const isNightShift = startHour >= 18 || startHour < 6;
 
-      const scoredGuards: any[] = [];
+      let scoredGuards: any[] = [];
 
       for (const g of allGuards) {
         const gId = String(g.id);
         const key = `${gId}_${dateIso}`;
-
-        // 1. Mandatory Rule: Only unassigned guards on this date
-        if (guardDailyAssignments[key]) {
-          continue; // Exclude guard already working on this date
-        }
+        const alreadyWorking = guardDailyAssignments[key];
 
         let score = 0;
         const rationale: string[] = [];
+
+        // 1. Availability / Daily assignment check
+        if (alreadyWorking) {
+          score -= 50; // Penalty for double assignment on same day
+          rationale.push('Same-Day Double Shift Warning');
+        } else {
+          score += 30; // Unassigned on this date
+        }
 
         // 2. Shift Preference Match (+40 pts)
         const pref = (g.shiftPreference || 'Flexible').toLowerCase();
@@ -302,18 +320,21 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
         }
 
         // 4. Rest Interval Protection (+20 pts)
-        const prevDay = new Date(r.date);
-        prevDay.setDate(prevDay.getDate() - 1);
-        const prevDateIso = prevDay.toISOString().split('T')[0];
-        const workedPrevDay = guardDailyAssignments[`${gId}_${prevDateIso}`];
-        if (!workedPrevDay) {
-          score += 20;
-          rationale.push('Rest Period Protected');
+        if (r.date) {
+          const prevDay = new Date(r.date);
+          prevDay.setDate(prevDay.getDate() - 1);
+          const prevDateIso = safeIsoDate(prevDay);
+          if (prevDateIso && !guardDailyAssignments[`${gId}_${prevDateIso}`]) {
+            score += 20;
+            rationale.push('Rest Period Protected');
+          } else {
+            score += 10;
+          }
         } else {
-          score += 10;
+          score += 15;
         }
 
-        // 5. Agency Continuity (+10 pts)
+        // 5. Base Continuity
         score += 10;
 
         scoredGuards.push({
@@ -322,7 +343,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           guardCode: g.guardId,
           agencyName: g.agency?.name || 'Direct Guard',
           shiftPreference: g.shiftPreference || 'Flexible',
-          matchScore: Math.min(100, score),
+          matchScore: Math.max(10, Math.min(100, score)),
           rationale
         });
       }
@@ -330,7 +351,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
       scoredGuards.sort((a, b) => b.matchScore - a.matchScore);
 
       const topGuard = scoredGuards[0] || null;
-      if (topGuard) {
+      if (topGuard && !guardDailyAssignments[`${topGuard.guardId}_${dateIso}`]) {
         guardSimulatedShifts[topGuard.guardId] = (guardSimulatedShifts[topGuard.guardId] || 0) + 1;
         guardDailyAssignments[`${topGuard.guardId}_${dateIso}`] = true;
       }
@@ -353,9 +374,9 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
     }
 
     res.json({ success: true, recommendations, count: recommendations.length });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to compute auto-schedule suggestions' });
+  } catch (err: any) {
+    console.error('Auto-Schedule Error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to compute auto-schedule suggestions' });
   }
 });
 
