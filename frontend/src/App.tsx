@@ -14,7 +14,7 @@ import GuardLayout from './components/GuardLayout';
 import GuardDashboard from './pages/guard/Dashboard';
 import GuardMyShifts from './pages/guard/MyShifts';
 import GuardReportIncident from './pages/guard/ReportIncident';
-import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, generateSchedules, assignGuard, fetchLogs, fetchAttendanceLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident, provisionGuardAccount } from './api';
+import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, generateSchedules, assignGuard, fetchLogs, fetchAttendanceLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident, provisionGuardAccount, batchAssignGuard, fetchAutoScheduleRecommendations } from './api';
 
 function Login({ onLogin }: { onLogin: (u: any) => void }) {
   const [email, setEmail] = useState('');
@@ -1481,6 +1481,69 @@ function Schedules({ role }: { role?: string }) {
     }
   };
 
+  const [isAutoScheduling, setIsAutoScheduling] = useState(false);
+  const [isCalculatingAutoSchedule, setIsCalculatingAutoSchedule] = useState(false);
+  const [autoScheduleFilter, setAutoScheduleFilter] = useState({
+    siteId: '',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+  });
+  const [autoRecommendations, setAutoRecommendations] = useState<any[]>([]);
+  const [selectedGuardMap, setSelectedGuardMap] = useState<{ [rosterId: string]: string }>({});
+  const [acceptedRosterMap, setAcceptedRosterMap] = useState<{ [rosterId: string]: boolean }>({});
+
+  const handleCalculateAutoSchedule = async (filterObj?: any) => {
+    setIsCalculatingAutoSchedule(true);
+    setErrorMsg('');
+    const targetFilter = filterObj || autoScheduleFilter;
+    try {
+      const res = await fetchAutoScheduleRecommendations({
+        siteId: targetFilter.siteId || undefined,
+        startDate: targetFilter.startDate,
+        endDate: targetFilter.endDate
+      });
+      const recs = res.recommendations || [];
+      setAutoRecommendations(recs);
+
+      const initialGuards: { [rId: string]: string } = {};
+      const initialAccepted: { [rId: string]: boolean } = {};
+      recs.forEach((item: any) => {
+        if (item.recommendedGuard) {
+          initialGuards[item.rosterId] = item.recommendedGuard.guardId;
+          initialAccepted[item.rosterId] = true;
+        }
+      });
+      setSelectedGuardMap(initialGuards);
+      setAcceptedRosterMap(initialAccepted);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to calculate auto-schedule recommendations');
+    } finally {
+      setIsCalculatingAutoSchedule(false);
+    }
+  };
+
+  const handleApplyAutoScheduleSubmit = async () => {
+    setErrorMsg('');
+    const targetRosterIds = Object.keys(acceptedRosterMap).filter(rId => acceptedRosterMap[rId] && selectedGuardMap[rId]);
+    if (targetRosterIds.length === 0) {
+      return setErrorMsg('No assignments selected to apply.');
+    }
+
+    try {
+      let appliedCount = 0;
+      for (const rId of targetRosterIds) {
+        const guardId = selectedGuardMap[rId];
+        await assignGuard(rId, guardId);
+        appliedCount++;
+      }
+      setIsAutoScheduling(false);
+      alert(`Successfully applied ${appliedCount} recommended shift assignments!`);
+      loadSchedules();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error applying recommendations');
+    }
+  };
+
   const handleAssignGuardSubmit = async (e: any) => {
     e.preventDefault();
     setErrorMsg('');
@@ -1802,6 +1865,21 @@ function Schedules({ role }: { role?: string }) {
           </div>
           {isOps && (
             <>
+              <button 
+                onClick={() => {
+                  const defaultFilter = {
+                    siteId: siteFilter !== 'All Sites' ? siteFilter : '',
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+                  };
+                  setAutoScheduleFilter(defaultFilter);
+                  setIsAutoScheduling(true);
+                  handleCalculateAutoSchedule(defaultFilter);
+                }}
+                className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                Auto-Schedule Suggestions
+              </button>
               <button 
                 onClick={() => setIsGeneratingSlots(true)} 
                 className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors"
@@ -2170,6 +2248,217 @@ function Schedules({ role }: { role?: string }) {
               <button type="submit" className="bg-orange-600 px-4 py-2 text-white text-[13px] font-medium rounded hover:bg-orange-700">Confirm Override</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {isAutoScheduling && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col border border-gray-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-[#1E3A5F] text-white p-5 flex justify-between items-start">
+              <div>
+                <h3 className="text-[18px] font-bold">Auto-Scheduler Recommendations</h3>
+                <p className="text-[12px] text-slate-200 mt-1">
+                  System-calculated shift assignment suggestions based on guard shift preferences, workload balance, and rest intervals.
+                  <span className="font-semibold text-slate-300 ml-1">(Optional - Review & Apply)</span>
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsAutoScheduling(false)} 
+                className="text-white opacity-70 hover:opacity-100 text-xl font-bold px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filter & Controls Bar */}
+            <div className="p-4 bg-slate-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase">Site Filter</label>
+                  <select
+                    value={autoScheduleFilter.siteId}
+                    onChange={e => setAutoScheduleFilter({ ...autoScheduleFilter, siteId: e.target.value })}
+                    className="border rounded px-2.5 py-1 text-[13px] bg-white border-gray-300 focus:outline-none"
+                  >
+                    <option value="">All Contract Sites</option>
+                    {uniqueSites.map((s: any) => (
+                      <option key={s.id} value={s.id}>{formatSiteName(s)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase">Start Date</label>
+                  <input
+                    type="date"
+                    value={autoScheduleFilter.startDate}
+                    onChange={e => setAutoScheduleFilter({ ...autoScheduleFilter, startDate: e.target.value })}
+                    className="border rounded px-2.5 py-1 text-[13px] bg-white border-gray-300 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase">End Date</label>
+                  <input
+                    type="date"
+                    value={autoScheduleFilter.endDate}
+                    onChange={e => setAutoScheduleFilter({ ...autoScheduleFilter, endDate: e.target.value })}
+                    className="border rounded px-2.5 py-1 text-[13px] bg-white border-gray-300 focus:outline-none"
+                  />
+                </div>
+                <div className="self-end">
+                  <button
+                    type="button"
+                    onClick={() => handleCalculateAutoSchedule()}
+                    disabled={isCalculatingAutoSchedule}
+                    className="bg-[#1E3A5F] text-white px-3 py-1.5 rounded text-[13px] font-medium hover:bg-[#162D4A] disabled:opacity-50 transition-colors"
+                  >
+                    {isCalculatingAutoSchedule ? 'Calculating...' : 'Recalculate'}
+                  </button>
+                </div>
+              </div>
+
+              {autoRecommendations.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allOn = Object.keys(acceptedRosterMap).length !== autoRecommendations.length || Object.values(acceptedRosterMap).some(v => !v);
+                      const newMap: any = {};
+                      autoRecommendations.forEach((rec: any) => {
+                        newMap[rec.rosterId] = allOn;
+                      });
+                      setAcceptedRosterMap(newMap);
+                    }}
+                    className="text-[12px] font-semibold text-[#1E3A5F] underline hover:text-blue-800"
+                  >
+                    Toggle Select All ({autoRecommendations.length})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Error Banner if any */}
+            {errorMsg && (
+              <div className="mx-5 mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-[13px] rounded-lg">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Recommendations Content Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-[#F8FAFC]">
+              {isCalculatingAutoSchedule ? (
+                <div className="py-12 text-center text-slate-500 text-[14px]">
+                  <p className="font-semibold text-[#1E3A5F]">Calculating Optimal Guard Pairings...</p>
+                  <p className="text-[12px] text-gray-400 mt-1">Analyzing guard shift preferences, workload balances, and rest constraints.</p>
+                </div>
+              ) : autoRecommendations.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-[14px] bg-white rounded-lg border border-dashed border-gray-300">
+                  <p className="font-semibold text-gray-700">No Unassigned Shifts Found</p>
+                  <p className="text-[12px] text-gray-400 mt-1">All shift slots for the selected filter are already assigned or no slots have been generated yet.</p>
+                </div>
+              ) : (
+                autoRecommendations.map((rec: any) => {
+                  const isAccepted = acceptedRosterMap[rec.rosterId] ?? true;
+                  const chosenGuardId = selectedGuardMap[rec.rosterId] || rec.recommendedGuard?.guardId || '';
+                  const topGuard = rec.recommendedGuard;
+
+                  return (
+                    <div 
+                      key={rec.rosterId}
+                      className={`bg-white rounded-lg border p-4 shadow-sm transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${isAccepted ? 'border-slate-300 ring-1 ring-slate-200' : 'border-gray-200 opacity-60'}`}
+                    >
+                      {/* Left: Checkbox & Shift Details */}
+                      <div className="flex items-start gap-3 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isAccepted}
+                          onChange={e => setAcceptedRosterMap({ ...acceptedRosterMap, [rec.rosterId]: e.target.checked })}
+                          className="mt-1 w-4 h-4 text-[#1E3A5F] rounded border-gray-300 focus:ring-0 cursor-pointer"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[13px] font-bold text-[#1E3A5F]">{rec.siteName}</span>
+                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-medium border border-slate-200">{rec.date}</span>
+                            <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded text-[11px] font-medium border border-blue-100">{rec.timing}</span>
+                          </div>
+
+                          {/* Recommended Guard Info & Rationale */}
+                          {topGuard ? (
+                            <div className="mt-2.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[13px] font-semibold text-slate-800">
+                                  System Recommendation: <span className="text-[#1E3A5F] font-bold">{topGuard.guardName}</span>
+                                </span>
+                                <span className="bg-slate-100 text-[#1E3A5F] text-[11px] font-bold px-2 py-0.5 rounded border border-slate-300">
+                                  {topGuard.matchScore}% Match Score
+                                </span>
+                              </div>
+
+                              {/* Rationale Badges */}
+                              <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                                {topGuard.rationale?.map((rat: string, idx: number) => (
+                                  <span key={idx} className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded font-medium border border-slate-200">
+                                    [ {rat} ]
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[12px] text-slate-500 font-medium mt-1">No unassigned guard available matching requirements for this date.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Guard Override Selector */}
+                      <div className="w-full md:w-64 flex flex-col justify-center border-t md:border-t-0 md:border-l border-gray-100 md:pl-4 pt-2 md:pt-0">
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">Assigned Guard (Override)</label>
+                        <select
+                          value={chosenGuardId}
+                          onChange={e => setSelectedGuardMap({ ...selectedGuardMap, [rec.rosterId]: e.target.value })}
+                          className="w-full border rounded px-2.5 py-1.5 text-[13px] bg-white border-gray-300 focus:outline-none focus:border-[#1E3A5F]"
+                        >
+                          <option value="">Select Guard...</option>
+                          {guards.map((g: any) => {
+                            const isRecommended = topGuard && g.id === topGuard.guardId;
+                            return (
+                              <option key={g.id} value={g.id}>
+                                {g.firstName} {g.lastName} ({g.guardId}){isRecommended ? ' (Recommended)' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between rounded-b-xl">
+              <p className="text-[12px] text-slate-500">
+                Suggestions are non-binding until explicitly applied.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAutoScheduling(false)}
+                  className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyAutoScheduleSubmit}
+                  disabled={autoRecommendations.length === 0 || isCalculatingAutoSchedule}
+                  className="bg-[#1E3A5F] text-white px-5 py-2 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  Apply Selected Assignments ({Object.keys(acceptedRosterMap).filter(k => acceptedRosterMap[k] && selectedGuardMap[k]).length})
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

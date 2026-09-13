@@ -178,6 +178,164 @@ router.post('/generate', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+router.post('/auto-schedule-preview', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { siteId, startDate, endDate } = req.body;
+    const start = startDate ? new Date(startDate) : new Date();
+    const end = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 86400000);
+    end.setHours(23, 59, 59, 999);
+
+    const where: any = {
+      date: { gte: start, lte: end },
+      OR: [
+        { guardId: null },
+        { status: 'Unassigned' }
+      ]
+    };
+    if (siteId) where.siteId = String(siteId);
+
+    const unassignedRosters = await (prisma as any).siteRoster.findMany({
+      where,
+      include: { site: true },
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }]
+    });
+
+    if (unassignedRosters.length === 0) {
+      res.json({ success: true, recommendations: [], count: 0, message: 'No unassigned shift slots found for the selected period.' });
+      return;
+    }
+
+    const allGuards = await (prisma as any).guard.findMany({
+      where: { status: 'ACTIVE' },
+      include: { agency: true }
+    });
+
+    const existingAssignedRosters = await (prisma as any).siteRoster.findMany({
+      where: {
+        date: { gte: start, lte: end },
+        guardId: { not: null }
+      }
+    });
+
+    const guardSimulatedShifts: { [guardId: string]: number } = {};
+    const guardDailyAssignments: { [guardId_dateIso: string]: boolean } = {};
+
+    existingAssignedRosters.forEach((r: any) => {
+      if (r.guardId && r.date) {
+        const gId = String(r.guardId);
+        const dateIso = new Date(r.date).toISOString().split('T')[0];
+        guardSimulatedShifts[gId] = (guardSimulatedShifts[gId] || 0) + 1;
+        guardDailyAssignments[`${gId}_${dateIso}`] = true;
+      }
+    });
+
+    const recommendations: any[] = [];
+
+    for (const r of unassignedRosters) {
+      const dateIso = new Date(r.date).toISOString().split('T')[0];
+      const startHour = parseInt((r.startTime || '08:00').split(':')[0], 10);
+      const isNightShift = startHour >= 18 || startHour < 6;
+
+      const scoredGuards: any[] = [];
+
+      for (const g of allGuards) {
+        const gId = String(g.id);
+        const key = `${gId}_${dateIso}`;
+
+        // 1. Mandatory Rule: Only unassigned guards on this date
+        if (guardDailyAssignments[key]) {
+          continue; // Exclude guard already working on this date
+        }
+
+        let score = 0;
+        const rationale: string[] = [];
+
+        // 2. Shift Preference Match (+40 pts)
+        const pref = (g.shiftPreference || 'Flexible').toLowerCase();
+        if ((pref.includes('day') && !isNightShift) || (pref.includes('night') && isNightShift)) {
+          score += 40;
+          rationale.push(`Shift Preference Match (${isNightShift ? 'Night' : 'Day'})`);
+        } else if (pref.includes('flexible') || !g.shiftPreference) {
+          score += 30;
+          rationale.push('Flexible Availability');
+        } else {
+          score += 10;
+          rationale.push('Available (Non-Preferred Shift)');
+        }
+
+        // 3. Workload Balancing (+30 pts max)
+        const currentCount = guardSimulatedShifts[gId] || 0;
+        if (currentCount === 0) {
+          score += 30;
+          rationale.push('Optimal Workload (0 prior shifts)');
+        } else if (currentCount === 1) {
+          score += 25;
+          rationale.push('Balanced Workload (1 prior shift)');
+        } else if (currentCount <= 3) {
+          score += 20;
+          rationale.push('Moderate Workload');
+        } else {
+          score += 10;
+        }
+
+        // 4. Rest Interval Protection (+20 pts)
+        const prevDay = new Date(r.date);
+        prevDay.setDate(prevDay.getDate() - 1);
+        const prevDateIso = prevDay.toISOString().split('T')[0];
+        const workedPrevDay = guardDailyAssignments[`${gId}_${prevDateIso}`];
+        if (!workedPrevDay) {
+          score += 20;
+          rationale.push('Rest Period Protected');
+        } else {
+          score += 10;
+        }
+
+        // 5. Agency Continuity (+10 pts)
+        score += 10;
+
+        scoredGuards.push({
+          guardId: gId,
+          guardName: `${g.firstName} ${g.lastName}`.trim() || g.guardId,
+          guardCode: g.guardId,
+          agencyName: g.agency?.name || 'Direct Guard',
+          shiftPreference: g.shiftPreference || 'Flexible',
+          matchScore: Math.min(100, score),
+          rationale
+        });
+      }
+
+      scoredGuards.sort((a, b) => b.matchScore - a.matchScore);
+
+      const topGuard = scoredGuards[0] || null;
+      if (topGuard) {
+        guardSimulatedShifts[topGuard.guardId] = (guardSimulatedShifts[topGuard.guardId] || 0) + 1;
+        guardDailyAssignments[`${topGuard.guardId}_${dateIso}`] = true;
+      }
+
+      const timingStr = r.startTime && r.endTime ? `${r.startTime} - ${r.endTime}` : '08:00 - 20:00';
+      const siteName = r.site?.name || 'Contract Site';
+
+      recommendations.push({
+        rosterId: r.id,
+        siteId: r.siteId,
+        siteName,
+        date: dateIso,
+        startTime: r.startTime || '08:00',
+        endTime: r.endTime || '20:00',
+        timing: timingStr,
+        shiftLabel: r.shiftLabel || timingStr,
+        recommendedGuard: topGuard,
+        alternativeGuards: scoredGuards.slice(1, 5)
+      });
+    }
+
+    res.json({ success: true, recommendations, count: recommendations.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to compute auto-schedule suggestions' });
+  }
+});
+
 router.put('/assign-batch', async (req: Request, res: Response): Promise<void> => {
   try {
     const { siteId, startDate, endDate, guardId, startTime, endTime } = req.body;

@@ -209,6 +209,18 @@ export const generateSchedules = async (params: { siteId?: string; startDate?: s
   return response.json();
 };
 
+export const fetchAutoScheduleRecommendations = async (params: { siteId?: string; startDate?: string; endDate?: string }) => {
+  const response = await authenticatedFetch(`${API_BASE_URL}/schedules/auto-schedule-preview`, {
+    method: 'POST',
+    body: JSON.stringify(params)
+  });
+  if (!response.ok) {
+     const data = await response.json().catch(() => ({}));
+     throw new Error(data.error || 'Failed to fetch auto-schedule suggestions');
+  }
+  return response.json();
+};
+
 export const assignGuard = async (rosterId: string, guardId: string) => {
   const response = await authenticatedFetch(`${API_BASE_URL}/schedules/assign/${rosterId}`, {
     method: 'PUT',
