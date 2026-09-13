@@ -64,7 +64,9 @@ router.post('/', async (req, res) => {
               accessInstructions: s.accessInstructions,
               knownHazards: s.knownHazards,
               guardsPerShift: s.guardsPerShift ? parseInt(s.guardsPerShift) : 1,
-              guardQualifications: s.guardQualifications
+              guardQualifications: s.guardQualifications,
+              latitude: s.latitude !== undefined && s.latitude !== null && !isNaN(parseFloat(s.latitude)) ? parseFloat(s.latitude) : null,
+              longitude: s.longitude !== undefined && s.longitude !== null && !isNaN(parseFloat(s.longitude)) ? parseFloat(s.longitude) : null
             }))
             : [{ name: 'Default Site' }]
         }
@@ -112,7 +114,9 @@ router.put('/:id', async (req, res) => {
               accessInstructions: s.accessInstructions,
               knownHazards: s.knownHazards,
               guardsPerShift: s.guardsPerShift ? parseInt(s.guardsPerShift) : 1,
-              guardQualifications: s.guardQualifications
+              guardQualifications: s.guardQualifications,
+              latitude: s.latitude ? parseFloat(s.latitude) : null,
+              longitude: s.longitude ? parseFloat(s.longitude) : null
             }))
             : [{ name: 'Default Site' }]
         }

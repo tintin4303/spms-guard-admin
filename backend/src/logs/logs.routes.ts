@@ -7,6 +7,56 @@ const router = Router();
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
+router.get('/attendance', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    let user: any = null;
+    if (token) {
+      try { user = jwt.verify(token, JWT_SECRET); } catch (e) {}
+    }
+
+    const where: any = {};
+    if (user?.role === 'CLIENT') {
+      where.roster = { site: { contract: { clientId: user.userId } } };
+    } else if (user?.role === 'AGENCY_MANAGER') {
+      where.guard = { agencyId: user.managedAgencyId };
+    }
+
+    const arrivals = await (prisma as any).arrivalLog.findMany({
+      where,
+      include: {
+        guard: { include: { agency: true } },
+        roster: { include: { site: true } }
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 100
+    });
+
+    const formattedArrivals = arrivals.map((a: any) => {
+      let computedStatus = a.status;
+      if (!computedStatus && a.roster?.startTime) {
+        const arrivalDate = new Date(a.timestamp);
+        const [shiftHour, shiftMin] = a.roster.startTime.split(':').map(Number);
+        const expectedTime = new Date(arrivalDate);
+        expectedTime.setHours(shiftHour, shiftMin, 0, 0);
+        
+        // Late if arrived > 10 minutes after scheduled shift start
+        const diffMinutes = (arrivalDate.getTime() - expectedTime.getTime()) / (1000 * 60);
+        computedStatus = diffMinutes > 10 ? 'Late' : 'On Time';
+      }
+      return {
+        ...a,
+        status: computedStatus || 'On Time'
+      };
+    });
+
+    res.json(formattedArrivals);
+  } catch (err) {
+    console.error('Error fetching attendance logs:', err);
+    res.status(500).json({ error: 'Failed to fetch attendance logs' });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];

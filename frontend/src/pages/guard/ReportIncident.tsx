@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { fetchGuardShifts, reportGuardIncident } from '../../api';
 
 export default function GuardIncidents() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [rosterId, setRosterId] = useState('');
   const [mapPinId, setMapPinId] = useState('');
+  const [locationDescription, setLocationDescription] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,34 +27,38 @@ export default function GuardIncidents() {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    if (!rosterId || !mapPinId || !description) return;
+    if (!rosterId || !description) return;
     setLoading(true);
     try {
-      await reportGuardIncident({ rosterId, mapPinId, description });
-      alert('Incident reported successfully.');
+      const fullDesc = locationDescription 
+        ? `[Location: ${locationDescription}] ${description}`
+        : description;
+      await reportGuardIncident({ rosterId, mapPinId: mapPinId || undefined, description: fullDesc });
+      toast.success('Incident report submitted successfully!');
       setDescription('');
+      setLocationDescription('');
       setMapPinId('');
     } catch (err) {
-      alert('Failed to report incident.');
+      toast.error('Failed to submit incident report.');
     }
     setLoading(false);
   };
 
   return (
-    <div className="bg-white rounded border border-[#E2E8F0] shadow-sm max-w-2xl mx-auto mt-6">
-      <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
-        <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Report Incident</h2>
+    <div className="bg-white mx-0 sm:mx-auto sm:mt-6 max-w-2xl rounded sm:rounded-xl border border-[#E2E8F0] shadow-sm relative z-0 mb-8 sm:mb-0">
+      <div className="px-4 sm:px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+        <h2 className="text-[18px] sm:text-[20px] font-semibold text-[#1E3A5F]">Report Incident</h2>
         <p className="text-[13px] text-gray-500 mt-1">Submit a real-time incident report to the Operations Manager.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
         <div>
           <label className="block text-[13px] font-medium text-gray-700 mb-1">Select Shift</label>
           <select 
             required 
             value={rosterId} 
             onChange={e => { setRosterId(e.target.value); setMapPinId(''); }}
-            className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full border rounded px-3 py-2 text-[14px] bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">-- Choose Active Shift --</option>
             {shifts.filter(s => s.status !== 'Completed' && !s.status.startsWith('Completed')).map(s => (
@@ -69,19 +75,33 @@ export default function GuardIncidents() {
         </div>
 
         <div>
-          <label className="block text-[13px] font-medium text-gray-700 mb-1">Incident Location (Checkpoint)</label>
+          <label className="block text-[13px] font-medium text-gray-700 mb-1">
+            Incident Location (Checkpoint - Optional)
+          </label>
           <select 
-            required 
             value={mapPinId} 
             onChange={e => setMapPinId(e.target.value)}
             disabled={!rosterId}
-            className="w-full border rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+            className="w-full border bg-white rounded px-3 py-2 text-[14px] focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
           >
-            <option value="">-- Choose Location --</option>
+            <option value="">-- Choose Checkpoint Pin (If Applicable) --</option>
             {allPins.map(pin => (
               <option key={pin.id} value={pin.id}>{pin.name} ({pin.pathName})</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-[13px] font-medium text-gray-700 mb-1">
+            Specific Location Details (If not at a checkpoint)
+          </label>
+          <input 
+            type="text"
+            value={locationDescription}
+            onChange={e => setLocationDescription(e.target.value)}
+            placeholder="e.g. 2nd Floor East Corridor / Parking Lot B"
+            className="w-full border rounded px-3 py-2 text-[14px] bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
         </div>
 
         <div>
@@ -99,8 +119,8 @@ export default function GuardIncidents() {
         <div className="pt-2">
           <button 
             type="submit" 
-            disabled={loading || !rosterId || !mapPinId || !description}
-            className="w-full bg-red-600 text-white font-medium py-2.5 rounded text-[14px] hover:bg-red-700 transition-colors disabled:opacity-50"
+            disabled={loading || !rosterId || !description}
+            className="w-full bg-red-600 text-white font-medium py-3 sm:py-2.5 rounded text-[14px] hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
           >
             {loading ? 'Submitting...' : 'Submit Incident Report'}
           </button>

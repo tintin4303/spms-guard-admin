@@ -60,13 +60,17 @@ router.get('/overview', async (req: any, res) => {
       return acc;
     }, {});
 
-    // Calculate real attendance and fulfillment
+    // Calculate real attendance, punctuality, and site breakdowns using ArrivalLogs
     const allRecentShifts = await prisma.siteRoster.findMany({
-      where: { ...rosterFilter, date: { gte: thirtyDaysAgo } }
+      where: { ...rosterFilter, date: { gte: thirtyDaysAgo } },
+      include: {
+        site: true,
+        arrivals: true
+      } as any
     });
     
     const totalShifts = allRecentShifts.length;
-    const completedShifts = allRecentShifts.filter(s => s.status.startsWith('Completed')).length;
+    const completedShifts = allRecentShifts.filter(s => s.status.startsWith('Completed') || s.status === 'In Progress').length;
     const attendanceRate = totalShifts > 0 ? parseFloat(((completedShifts / totalShifts) * 100).toFixed(1)) : 0;
 
     const exceptionCount = await prisma.shiftException.count({
@@ -74,19 +78,49 @@ router.get('/overview', async (req: any, res) => {
     });
     const contractFulfillment = totalShifts > 0 ? parseFloat((((totalShifts - exceptionCount) / totalShifts) * 100).toFixed(1)) : 100;
 
-    // Calculate real resolution times
-    const resolvedIncidents = recentIncidents.filter(inc => inc.resolved && inc.resolvedAt);
-    let totalResolutionMinutes = 0;
-    resolvedIncidents.forEach(inc => {
-      if (inc.resolvedAt) {
-        totalResolutionMinutes += (inc.resolvedAt.getTime() - inc.timestamp.getTime()) / 60000;
+    // Site Attendance & Punctuality Breakdown
+    const siteAttendanceMap: Record<string, { onTime: number; late: number; absent: number }> = {};
+    let totalOnTime = 0;
+    let totalLate = 0;
+    let totalAbsent = 0;
+
+    allRecentShifts.forEach((shift: any) => {
+      const siteName = shift.site?.name || 'Unassigned Site';
+      if (!siteAttendanceMap[siteName]) {
+        siteAttendanceMap[siteName] = { onTime: 0, late: 0, absent: 0 };
+      }
+
+      if (shift.arrivals && shift.arrivals.length > 0) {
+        const arrival = shift.arrivals[0];
+        if (arrival.status === 'On Time') {
+          siteAttendanceMap[siteName].onTime += 1;
+          totalOnTime += 1;
+        } else {
+          siteAttendanceMap[siteName].late += 1;
+          totalLate += 1;
+        }
+      } else if (shift.status === 'Scheduled' && shift.date && new Date(shift.date).getTime() < Date.now()) {
+        siteAttendanceMap[siteName].absent += 1;
+        totalAbsent += 1;
+      } else if (shift.status.startsWith('Completed')) {
+        siteAttendanceMap[siteName].onTime += 1;
+        totalOnTime += 1;
       }
     });
-    const avgResMins = resolvedIncidents.length > 0 ? Math.round(totalResolutionMinutes / resolvedIncidents.length) : 0;
-    const resolutionTimes = {
-      critical: avgResMins ? Math.max(1, Math.round(avgResMins * 0.5)) : 12,
-      warning: avgResMins || 45,
-      routine: avgResMins ? Math.round(avgResMins * 1.5) : 120
+
+    const siteAttendanceData = Object.keys(siteAttendanceMap).map(site => ({
+      site,
+      onTime: siteAttendanceMap[site].onTime,
+      late: siteAttendanceMap[site].late,
+      absent: siteAttendanceMap[site].absent
+    }));
+
+    // Overall Punctuality Summary
+    const punctualitySummary = {
+      onTime: totalOnTime,
+      late: totalLate,
+      absent: totalAbsent,
+      onTimeRate: (totalOnTime + totalLate) > 0 ? parseFloat(((totalOnTime / (totalOnTime + totalLate)) * 100).toFixed(1)) : 100
     };
 
     res.json({
@@ -96,8 +130,9 @@ router.get('/overview', async (req: any, res) => {
       pendingAlerts,
       attendanceRate,
       contractFulfillment,
-      incidentFrequency,
-      resolutionTimes
+      siteAttendanceData,
+      punctualitySummary,
+      incidentFrequency
     });
   } catch (err) {
     console.error(err);
@@ -112,32 +147,101 @@ router.get('/guards', async (req: any, res) => {
     if (user?.role === 'AGENCY_MANAGER') filter.agencyId = user.managedAgencyId;
     if (user?.role === 'CLIENT') filter.rosters = { some: { site: { contract: { clientId: user.userId } } } };
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const { startDate, endDate, siteId } = req.query;
+    const startObj = startDate ? new Date(String(startDate)) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const endObj = endDate ? new Date(String(endDate)) : new Date();
+
+    const rosterWhere: any = { date: { gte: startObj, lte: endObj } };
+    if (siteId) rosterWhere.siteId = String(siteId);
 
     const guards = await prisma.guard.findMany({
       where: filter,
       include: {
         agency: true,
         rosters: {
-          where: { date: { gte: thirtyDaysAgo } },
-          include: { site: true }
+          where: rosterWhere,
+          include: { 
+            site: true,
+            arrivals: true,
+            exceptions: true
+          }
         },
         checkIns: {
-          where: { isIncident: true, timestamp: { gte: thirtyDaysAgo } }
+          where: { isIncident: true, timestamp: { gte: startObj, lte: endObj } }
         }
       }
     });
 
     const mapped = guards.map((g: any) => {
+      const totalAssigned = g.rosters.length;
       const completedShifts = g.rosters.filter((r: any) => r.status.startsWith('Completed')).length;
-      const hoursWorked = completedShifts * 8; // assuming 8-hour shifts
-      const maxHours = 160; // 40 hours/week * 4 weeks
-      const utilization = Math.min(100, Math.round((hoursWorked / maxHours) * 100));
+
+      // Calculate actual hours from shift timings on completed rosters
+      let actualHours = 0;
+      g.rosters.filter((r: any) => r.status.startsWith('Completed')).forEach((r: any) => {
+        const [sh, sm] = r.startTime.split(':').map(Number);
+        const [eh, em] = r.endTime.split(':').map(Number);
+        let diff = (eh * 60 + em) - (sh * 60 + sm);
+        if (diff <= 0) diff += 24 * 60; // overnight shift
+        actualHours += diff / 60;
+      });
+      actualHours = Math.round(actualHours * 10) / 10;
+
+      // Attendance via ArrivalLog
+      let arrivedCount = 0;
+      let onTimeCount = 0;
+      let lateCount = 0;
+
+      g.rosters.forEach((r: any) => {
+        if (r.arrivals && r.arrivals.length > 0) {
+          arrivedCount++;
+          const arrival = r.arrivals[0];
+          // Compare arrival timestamp to shift start time (10-min threshold)
+          if (r.date) {
+            const shiftDate = new Date(r.date);
+            const [hrs, mins] = r.startTime.split(':').map(Number);
+            const shiftStart = new Date(shiftDate);
+            shiftStart.setHours(hrs, mins, 0, 0);
+            const graceDeadline = new Date(shiftStart.getTime() + 10 * 60 * 1000); // 10 min grace
+            if (new Date(arrival.timestamp) <= graceDeadline) {
+              onTimeCount++;
+            } else {
+              lateCount++;
+            }
+          } else {
+            onTimeCount++; // Can't compare without date, assume on-time
+          }
+        }
+      });
+
+      const attendanceRate = totalAssigned > 0 ? Math.round((arrivedCount / totalAssigned) * 100) : 0;
+      const exceptionCount = g.rosters.reduce((sum: number, r: any) => sum + (r.exceptions?.length || 0), 0);
+      const noShowCount = totalAssigned - arrivedCount - exceptionCount;
+
+      // Distinct sites covered
+      const siteNames = [...new Set(g.rosters.map((r: any) => r.site?.name).filter(Boolean))];
+      const avgIncidentsPerShift = completedShifts > 0 ? Math.round((g.checkIns.length / completedShifts) * 100) / 100 : 0;
 
       return {
-        ...g,
+        id: g.id,
+        guardId: g.guardId,
+        firstName: g.firstName,
+        lastName: g.lastName,
+        source: g.source,
+        status: g.status,
+        agency: g.agency,
+        // Enriched metrics
+        totalAssigned,
+        completedShifts,
+        attendanceRate,
+        onTimeCount,
+        lateCount,
+        noShowCount: Math.max(0, noShowCount),
+        exceptionCount,
+        actualHours,
+        sitesCovered: siteNames.join(', '),
         incidentCount: g.checkIns.length,
-        utilization
+        avgIncidentsPerShift
       };
     });
 

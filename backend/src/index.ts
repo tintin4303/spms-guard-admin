@@ -9,7 +9,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
+export const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || '*',
     methods: ['GET', 'POST']
@@ -17,7 +17,8 @@ const io = new Server(httpServer, {
 });
 const prisma = new PrismaClient();
 
-app.use(cors());
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json());
 
 import authRouter from './auth/auth.routes';

@@ -1,11 +1,12 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Users, CalendarDays, BookOpen, BarChart2, LogOut } from 'lucide-react';
+import { Users, CalendarDays, BookOpen, BarChart2, LogOut, Settings } from 'lucide-react';
 
 const agencyNav = [
  { href: '/agency', icon: Users, label: 'Agency Roster' },
  { href: '/agency/schedules', icon: CalendarDays, label: 'Shift Schedules' },
  { href: '/agency/logs', icon: BookOpen, label: 'Incident Reports' },
  { href: '/agency/reports', icon: BarChart2, label: 'Performance Analytics' },
+ { href: '/agency/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function AgencyLayout({ user, onLogout }: { user: any, onLogout: () => void }) {

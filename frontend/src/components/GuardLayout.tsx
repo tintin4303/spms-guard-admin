@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, AlertTriangle, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, AlertTriangle, Settings, LogOut, Menu, X } from 'lucide-react';
 
 const guardNav = [
   { href: '/guard', icon: LayoutDashboard, label: 'Guard Dashboard' },
   { href: '/guard/shifts', icon: CalendarDays, label: 'My Shifts' },
   { href: '/guard/incidents', icon: AlertTriangle, label: 'Report Incident' },
+  { href: '/guard/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function GuardLayout({ user, onLogout }: { user: any, onLogout: () => void }) {

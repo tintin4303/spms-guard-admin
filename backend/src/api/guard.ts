@@ -1,10 +1,13 @@
 import express from 'express';
 import { requireRole } from '../middleware/roleCheck';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// Enforce JWT token authentication for all guard portal routes
+router.use(authenticateToken);
 
 // Get Guard Profile
 const getGuardProfile = async (userId: string) => {
@@ -17,7 +20,7 @@ const getGuardProfile = async (userId: string) => {
 router.get('/shifts', requireRole(['GUARD']), async (req: AuthRequest, res) => {
   try {
     const guard = await getGuardProfile(req.user!.userId);
-    if (!guard) return res.status(404).json({ error: 'Guard profile not found' });
+    if (!guard) return res.json([]);
 
     const shifts = await prisma.siteRoster.findMany({
       where: { guardId: guard.id },
@@ -134,17 +137,71 @@ router.post('/incidents', requireRole(['GUARD']), async (req: AuthRequest, res) 
   }
 });
 
+// Mark arrival at site for attendance tracking
+router.post('/shifts/:rosterId/arrive', requireRole(['GUARD']), async (req: AuthRequest, res) => {
+  try {
+    const guard = await getGuardProfile(req.user!.userId);
+    if (!guard) return res.status(404).json({ error: 'Guard profile not found' });
+
+    const rosterId = req.params.rosterId as string;
+    const { latitude, longitude } = req.body;
+
+    // Check roster exists and belongs to this guard
+    const roster = await prisma.siteRoster.findUnique({ where: { id: rosterId } });
+    if (!roster || roster.guardId !== guard.id) {
+      return res.status(403).json({ error: 'Roster not found or not assigned to you.' });
+    }
+
+    // Prevent duplicate arrivals
+    const existing = await prisma.arrivalLog.findFirst({ where: { rosterId, guardId: guard.id } });
+    if (existing) {
+      return res.status(400).json({ error: 'You have already marked arrival for this shift.' });
+    }
+
+    const arrival = await prisma.arrivalLog.create({
+      data: {
+        guardId: guard.id,
+        rosterId,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null
+      }
+    });
+
+    // Update roster status to In Progress
+    await prisma.siteRoster.update({
+      where: { id: rosterId },
+      data: { status: 'In Progress' }
+    });
+
+    res.json(arrival);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to record arrival' });
+  }
+});
+
 // Get metrics
 router.get('/metrics', requireRole(['GUARD']), async (req: AuthRequest, res) => {
   try {
     const guard = await getGuardProfile(req.user!.userId);
     if (!guard) return res.status(404).json({ error: 'Guard profile not found' });
 
-    const completedShifts = await prisma.siteRoster.count({
+    const completedRosters = await prisma.siteRoster.findMany({
       where: { guardId: guard.id, status: { startsWith: 'Completed' } }
     });
 
-    const totalHours = completedShifts * 12; 
+    const completedShifts = completedRosters.length;
+
+    // Calculate actual hours from shift timings
+    let totalHours = 0;
+    completedRosters.forEach((r: any) => {
+      const [sh, sm] = r.startTime.split(':').map(Number);
+      const [eh, em] = r.endTime.split(':').map(Number);
+      let diff = (eh * 60 + em) - (sh * 60 + sm);
+      if (diff <= 0) diff += 24 * 60; // overnight shift
+      totalHours += diff / 60;
+    });
+    totalHours = Math.round(totalHours);
 
     const incidentsReported = await prisma.operationLog.count({
       where: { guardId: guard.id, isIncident: true }

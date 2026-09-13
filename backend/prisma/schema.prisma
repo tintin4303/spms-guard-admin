@@ -118,6 +118,7 @@ model Guard {
   rosters            SiteRoster[]
   replacements       ShiftException[] @relation("ReplacementGuardRelation")
   checkIns           OperationLog[]
+  arrivals           ArrivalLog[]
 }
 
 // ---------------------------------------------
@@ -162,6 +163,8 @@ model Site {
   knownHazards         String?
   guardsPerShift       Int       @default(1)
   guardQualifications  String?
+  latitude             Float?
+  longitude            Float?
   
   contractId  String
   contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -178,14 +181,18 @@ model SiteRoster {
   date       DateTime?
   status     String   @default("Scheduled") // "Scheduled", "Completed", etc.
   
-  guardId    String
-  guard      Guard @relation(fields: [guardId], references: [id])
+  guardId    String?
+  guard      Guard? @relation(fields: [guardId], references: [id])
   
   siteId     String
   site       Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
+  patrolPathId String?
+  patrolPath   PatrolPath? @relation(fields: [patrolPathId], references: [id])
+
   exceptions ShiftException[]
   logs       OperationLog[]
+  arrivals   ArrivalLog[]
 }
 
 model ShiftException {
@@ -212,6 +219,7 @@ model PatrolPath {
   site     Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
   
   pins     MapPin[]
+  rosters  SiteRoster[]
 }
 
 model MapPin {
@@ -247,3 +255,35 @@ model OperationLog {
   rosterId    String?
   roster      SiteRoster? @relation(fields: [rosterId], references: [id], onDelete: Cascade)
 }
+
+// ---------------------------------------------
+// AUDIT TRAIL
+// ---------------------------------------------
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  action        String   // "CREATE", "UPDATE", "DELETE", "RESOLVE", "ASSIGN"
+  entity        String   // "Guard", "Contract", "SiteRoster", "OperationLog", etc.
+  entityId      String?
+  performedById String?
+  details       Json?
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------
+// GUARD ATTENDANCE / ARRIVAL TRACKING
+// ---------------------------------------------
+
+model ArrivalLog {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  latitude    Float?   // GPS at arrival (for future mobile app)
+  longitude   Float?   // GPS at arrival (for future mobile app)
+  
+  guardId     String
+  guard       Guard    @relation(fields: [guardId], references: [id])
+  
+  rosterId    String
+  roster      SiteRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+}
+

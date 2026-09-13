@@ -1,7 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
-import { Toaster } from 'react-hot-toast';
-import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Calendar, Download } from 'lucide-react';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Calendar, Search, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import DashboardLayout from './components/DashboardLayout';
@@ -9,12 +8,11 @@ import AdminLayout from './components/AdminLayout';
 import ClientLayout from './components/ClientLayout';
 import AgencyLayout from './components/AgencyLayout';
 import MapControl from './components/MapControl';
-import SiteLocationPicker from './components/SiteLocationPicker';
 import GuardLayout from './components/GuardLayout';
 import GuardDashboard from './pages/guard/Dashboard';
 import GuardMyShifts from './pages/guard/MyShifts';
 import GuardReportIncident from './pages/guard/ReportIncident';
-import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, generateSchedules, assignGuard, fetchLogs, fetchAttendanceLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident, provisionGuardAccount } from './api';
+import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, fetchLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident, provisionGuardAccount } from './api';
 
 function Login({ onLogin }: { onLogin: (u: any) => void }) {
   const [email, setEmail] = useState('');
@@ -27,33 +25,28 @@ function Login({ onLogin }: { onLogin: (u: any) => void }) {
     try {
       const data = await loginUser(email, password);
       if (data.token) localStorage.setItem('spms_token', data.token);
-      const userObj = {
-        ...data.user,
-        name: data.user?.name || data.user?.email?.split('@')[0] || 'Guard User'
-      };
-      onLogin(userObj);
+      onLogin(data.user);
     } catch (err) { alert("Failed to log in"); }
     setLoading(false);
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#F8FAFC] p-4 sm:p-6">
-      <div className="flex flex-col md:flex-row w-full max-w-[850px] bg-white rounded-xl shadow-lg border border-[#E2E8F0] overflow-hidden">
+    <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFC]">
+      <div className="flex w-[800px] bg-white rounded-xl shadow-lg border border-[#E2E8F0] overflow-hidden">
 
-        {/* Login Form Section */}
-        <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-10 border-b md:border-b-0 md:border-r border-[#E2E8F0] flex flex-col justify-center">
-          <div className="mb-6 md:mb-8 text-center md:text-left">
-            <h2 className="text-[22px] sm:text-[26px] font-bold text-[#1E3A5F]">SPMS Portal</h2>
-            <p className="text-[13px] sm:text-[14px] text-gray-500 mt-1">Sign in to your operations account</p>
+        <div className="w-1/2 p-10 border-r border-[#E2E8F0] flex flex-col justify-center">
+          <div className="mb-8">
+            <h2 className="text-[26px] font-bold text-[#1E3A5F]">SPMS Portal</h2>
+            <p className="text-[14px] text-gray-500 mt-1">Sign in to your operations account</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Email address</label>
               <input required value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="example@spms.com" className="w-full border border-gray-300 rounded px-3 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F]" />
             </div>
             <div>
               <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Password</label>
-              <input required value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="••••••••" className="w-full border border-gray-300 rounded px-3 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F]" />
+              <input required value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข" className="w-full border border-gray-300 rounded px-3 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F]" />
             </div>
             <button disabled={loading} type="submit" className="w-full bg-[#1E3A5F] text-white py-2.5 rounded text-[14px] font-medium hover:bg-[#162D4A] mt-2 transition-colors">
               {loading ? 'Authenticating...' : 'Sign In'}
@@ -61,32 +54,27 @@ function Login({ onLogin }: { onLogin: (u: any) => void }) {
           </form>
         </div>
 
-        {/* Active Demo Credentials Section */}
-        <div className="w-full md:w-1/2 bg-[#F1F5F9] p-6 sm:p-8 md:p-10 flex flex-col justify-center">
-          <h3 className="text-[13px] sm:text-[14px] font-bold text-[#1E3A5F] mb-4 md:mb-5 uppercase tracking-wider">Active Demo Credentials</h3>
-          <ul className="space-y-3 sm:space-y-4 text-[13px] text-gray-700">
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
+        <div className="w-1/2 bg-[#F1F5F9] p-10 flex flex-col justify-center">
+          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-5 uppercase tracking-wider">Active Demo Credentials</h3>
+          <ul className="space-y-4 text-[13px] text-gray-700">
+            <li className="flex flex-col border-b border-gray-200 pb-3">
               <span className="font-semibold text-[#1E3A5F]">Operation Manager</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">ops@spms.com</span>
+              <span className=" mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all">ops@spms.com</span>
             </li>
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
-              <span className="font-semibold text-[#1E3A5F]">Security Guard</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">guard1@spms.com</span>
-            </li>
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
+            <li className="flex flex-col border-b border-gray-200 pb-3">
               <span className="font-semibold text-[#1E3A5F]">System Admin</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">admin@spms.com</span>
+              <span className=" mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all">admin@spms.com</span>
             </li>
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
+            <li className="flex flex-col border-b border-gray-200 pb-3">
               <span className="font-semibold text-[#1E3A5F]">Client</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">client@spms.com</span>
+              <span className=" mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all">client@spms.com</span>
             </li>
-            <li className="flex flex-col pb-1">
+            <li className="flex flex-col pb-2">
               <span className="font-semibold text-[#1E3A5F]">Agency Manager</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">agency@spms.com</span>
+              <span className=" mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all">agency@spms.com</span>
             </li>
           </ul>
-          <p className="text-[11px] text-gray-500 mt-4 md:mt-6">(The password for all accounts is 1234 or password123)</p>
+          <p className="text-[11px] text-gray-500 mt-6">(The password is 1234)</p>
         </div>
       </div>
     </div>
@@ -270,7 +258,7 @@ function ClientContracts({ user }: { user?: any }) {
                 <tr key={c.id} className="hover:bg-[#F8FAFC] border-b border-gray-100 last:border-0">
                   <td className="px-6 py-4 text-[12px] font-medium text-blue-600">{c.id.substring(0, 8).toUpperCase()}</td>
                   <td className="px-6 py-4 text-[14px] font-medium text-[#0F172A]">{c.client?.name || 'My Company'}</td>
-                  <td className="px-6 py-4 text-[14px] text-[#475569]">{new Date(c.startDate).toLocaleDateString()} — {new Date(c.endDate).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-[14px] text-[#475569]">{new Date(c.startDate).toLocaleDateString()} โ€” {new Date(c.endDate).toLocaleDateString()}</td>
                   <td className="px-6 py-4 text-[14px] text-[#475569]">{c.sites?.[0]?.name ? c.sites[0].name : 'Primary Facility'} <span className="text-gray-400 text-[12px]">({c.sites?.[0]?.address || 'Registered Address'})</span></td>
                   <td className="px-6 py-4 text-[14px] font-medium text-green-700">Active</td>
                 </tr>
@@ -389,7 +377,7 @@ function AdminGuardProvisioning() {
               </div>
               <div>
                 <label className="block text-[13px] font-medium mb-1">Temporary Password</label>
-                <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" placeholder="••••••••" />
+                <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" placeholder="โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข" />
               </div>
             </div>
             <div className="p-6 bg-gray-50 border-t flex justify-end gap-2">
@@ -419,7 +407,7 @@ function AdminUserManagement() {
   const [role, setRole] = useState('CLIENT');
 
   // Client Specific Fields
-  const [clientType, setClientType] = useState('นิติบุคคล');
+  const [clientType, setClientType] = useState('เธเธดเธ•เธดเธเธธเธเธเธฅ');
   const [taxId, setTaxId] = useState('');
   const [registeredNameTh, setRegisteredNameTh] = useState('');
   const [registeredNameEn, setRegisteredNameEn] = useState('');
@@ -455,7 +443,7 @@ function AdminUserManagement() {
       setName('');
       setPassword('');
       setRole('CLIENT');
-      setClientType('นิติบุคคล');
+      setClientType('เธเธดเธ•เธดเธเธธเธเธเธฅ');
       setTaxId('');
       setRegisteredNameTh('');
       setRegisteredNameEn('');
@@ -559,12 +547,12 @@ function AdminUserManagement() {
                       <div>
                         <label className="block text-[13px] font-medium mb-1">Client Type</label>
                         <select value={clientType} onChange={e => setClientType(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]">
-                          <option value="นิติบุคคล">นิติบุคคล (Corporate)</option>
-                          <option value="บุคคลธรรมดา">บุคคลธรรมดา (Individual)</option>
+                          <option value="เธเธดเธ•เธดเธเธธเธเธเธฅ">เธเธดเธ•เธดเธเธธเธเธเธฅ (Corporate)</option>
+                          <option value="เธเธธเธเธเธฅเธเธฃเธฃเธกเธ”เธฒ">เธเธธเธเธเธฅเธเธฃเธฃเธกเธ”เธฒ (Individual)</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[13px] font-medium mb-1">Tax ID (13 หลัก)</label>
+                        <label className="block text-[13px] font-medium mb-1">Tax ID (13 เธซเธฅเธฑเธ)</label>
                         <input value={taxId} onChange={e => setTaxId(e.target.value)} className="w-full border rounded px-3 py-2 text-[14px]" />
                       </div>
                     </div>
@@ -580,7 +568,7 @@ function AdminUserManagement() {
                     </div>
                     <div>
                       <label className="block text-[13px] font-medium mb-1">Full Address</label>
-                      <input value={address} onChange={e => setAddress(e.target.value)} placeholder="เลขที่/หมู่/ซอย/ถนน, ตำบล, อำเภอ, จังหวัด, รหัสไปรษณีย์" className="w-full border rounded px-3 py-2 text-[14px]" />
+                      <input value={address} onChange={e => setAddress(e.target.value)} placeholder="เน€เธฅเธเธ—เธตเน/เธซเธกเธนเน/เธเธญเธข/เธ–เธเธ, เธ•เธณเธเธฅ, เธญเธณเน€เธ เธญ, เธเธฑเธเธซเธงเธฑเธ”, เธฃเธซเธฑเธชเนเธเธฃเธฉเธ“เธตเธขเน" className="w-full border rounded px-3 py-2 text-[14px]" />
                     </div>
 
                     <h4 className="text-[14px] font-semibold text-[#1E3A5F] mb-3 mt-4 pt-4 border-t">Contact Info</h4>
@@ -641,11 +629,10 @@ function Contracts() {
     damages: '',
     terminationTerms: '',
     contractFileUrl: '',
-    sites: [{ name: 'Corporate Campus', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'], address: '', siteType: 'Warehouse', accessInstructions: '', knownHazards: '', guardsPerShift: 1, guardQualifications: '', latitude: null, longitude: null }]
+    sites: [{ name: 'Corporate Campus', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'], address: '', siteType: 'Warehouse', accessInstructions: '', knownHazards: '', guardsPerShift: 1, guardQualifications: '' }]
   };
 
   const [formData, setFormData] = useState(defaultFormData);
-  const [pickerSiteIndex, setPickerSiteIndex] = useState<number | null>(null);
 
   const loadContracts = () => {
     fetchContracts().then(setContracts).catch(console.error);
@@ -687,9 +674,7 @@ function Contracts() {
         accessInstructions: s.accessInstructions || '',
         knownHazards: s.knownHazards || '',
         guardsPerShift: s.guardsPerShift || 1,
-        guardQualifications: s.guardQualifications || '',
-        latitude: s.latitude || null,
-        longitude: s.longitude || null
+        guardQualifications: s.guardQualifications || ''
       })) : defaultFormData.sites
     });
     setIsCreating(true);
@@ -894,17 +879,8 @@ function Contracts() {
                     </div>
 
                     <div className="mb-3">
-                      <label className="block text-[12px] font-medium text-gray-700 mb-1">Full Address & Geolocation</label>
-                      <div className="flex gap-2">
-                        <input value={site.address} onChange={e => updateSiteField(i, 'address', e.target.value)} placeholder="Physical address..." className="flex-1 border rounded px-3 py-1.5 text-[14px] bg-white" />
-                        <button
-                          type="button"
-                          onClick={() => setPickerSiteIndex(i)}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded text-[12px] font-semibold flex items-center gap-1 shadow-sm shrink-0"
-                        >
-                          📍 {site.latitude && site.longitude ? `${site.latitude.toFixed(4)}, ${site.longitude.toFixed(4)}` : 'Pick Pin'}
-                        </button>
-                      </div>
+                      <label className="block text-[12px] font-medium text-gray-700 mb-1">Full Address</label>
+                      <input value={site.address} onChange={e => updateSiteField(i, 'address', e.target.value)} className="w-full border rounded px-3 py-1.5 text-[14px] bg-white" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mb-3">
@@ -957,7 +933,7 @@ function Contracts() {
                     </div>
                   </div>
                 ))}
-                <button type="button" onClick={() => setFormData({ ...formData, sites: [...formData.sites, { name: '', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'], address: '', siteType: 'Corporate', accessInstructions: '', knownHazards: '', guardsPerShift: 1, guardQualifications: '', latitude: null, longitude: null }] })} className="text-[13px] text-[#1E3A5F] hover:underline font-medium">+ Add another physical site scope</button>
+                <button type="button" onClick={() => setFormData({ ...formData, sites: [...formData.sites, { name: '', shiftCount: 2, baseStartTime: '08:00', shiftTimings: ['08:00 - 20:00', '20:00 - 08:00'], address: '', siteType: 'Corporate', accessInstructions: '', knownHazards: '', guardsPerShift: 1, guardQualifications: '' }] })} className="text-[13px] text-[#1E3A5F] hover:underline font-medium">+ Add another physical site scope</button>
               </div>
             </div>
 
@@ -970,18 +946,6 @@ function Contracts() {
           </form>
         </div>
       )}
-
-      {pickerSiteIndex !== null && (
-        <SiteLocationPicker
-          initialLat={formData.sites[pickerSiteIndex]?.latitude}
-          initialLng={formData.sites[pickerSiteIndex]?.longitude}
-          onSelectLocation={(lat, lng) => {
-            updateSiteField(pickerSiteIndex, 'latitude', lat);
-            updateSiteField(pickerSiteIndex, 'longitude', lng);
-          }}
-          onClose={() => setPickerSiteIndex(null)}
-        />
-      )}
     </>
   );
 }
@@ -989,26 +953,9 @@ function Contracts() {
 function Guards() {
   const [guards, setGuards] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [shiftFilter, setShiftFilter] = useState('All');
-
-  const filteredGuards = useMemo(() => {
-    return guards.filter(g => {
-      const gName = (g.firstName + ' ' + g.lastName).toLowerCase();
-      const agencyName = (g.agency?.name || 'In-House').toLowerCase();
-      const matchesSearch = gName.includes(searchQuery.toLowerCase()) || 
-                            g.guardId.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            agencyName.includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'All' || g.status === statusFilter;
-      const matchesShift = shiftFilter === 'All' || g.shiftPreference === shiftFilter;
-      return matchesSearch && matchesStatus && matchesShift;
-    });
-  }, [guards, searchQuery, statusFilter, shiftFilter]);
-
   const itemsPerPage = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredGuards.length / itemsPerPage));
-  const paginatedGuards = filteredGuards.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(guards.length / itemsPerPage);
+  const paginatedGuards = guards.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1090,35 +1037,11 @@ function Guards() {
   return (
     <>
       <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
-        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC] gap-6">
-          <div className="flex-shrink-0">
-            <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Guard Roster</h2>
-            <p className="text-[13px] text-gray-500">Manage all registered guards.</p>
-          </div>
-          <div className="flex flex-1 items-center gap-2 justify-end">
-            <input
-              type="text"
-              placeholder="Search ID, Name, Agency..."
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none focus:border-[#1E3A5F] flex-1 max-w-[800px]"
-            />
-            <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }} className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none">
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="On Leave">On Leave</option>
-              <option value="Suspended">Suspended</option>
-            </select>
-            <select value={shiftFilter} onChange={e => { setShiftFilter(e.target.value); setCurrentPage(1); }} className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none">
-              <option value="All">All Shifts</option>
-              <option value="Flexible">Flexible</option>
-              <option value="Day">Day</option>
-              <option value="Night">Night</option>
-            </select>
-            <button onClick={openCreate} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors ml-2">
-              + Onboard Guard
-            </button>
-          </div>
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
+          <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Guard Roster</h2>
+          <button onClick={openCreate} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
+            + Onboard Guard
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -1134,9 +1057,9 @@ function Guards() {
               </tr>
             </thead>
             <tbody>
-              {filteredGuards.length === 0 ? (
+              {guards.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No guards match your search filters.</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-[13px] text-[#6B7280]">No guards found in roster.</td>
                 </tr>
               ) : (
                 paginatedGuards.map((g) => (
@@ -1276,17 +1199,10 @@ function Guards() {
 function Schedules({ role }: { role?: string }) {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [guards, setGuards] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'monthly'>('monthly');
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
-    const today = new Date();
-    today.setDate(today.getDate() - today.getDay());
-    return today;
-  });
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [isCreatingRoster, setIsCreatingRoster] = useState(false);
   const [isCreatingException, setIsCreatingException] = useState(false);
   const [siteFilter, setSiteFilter] = useState('All Sites');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
   const [contracts, setContracts] = useState<any[]>([]);
 
   const defaultFormData = {
@@ -1301,9 +1217,6 @@ function Schedules({ role }: { role?: string }) {
   };
   const [formData, setFormData] = useState(defaultFormData);
   const [errorMsg, setErrorMsg] = useState('');
-  
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isAssigning, setIsAssigning] = useState<any>(null);
 
   const loadSchedules = () => {
     // If a site is selected, we could pass it to fetchSchedules, but we can also just filter client-side.
@@ -1431,347 +1344,16 @@ function Schedules({ role }: { role?: string }) {
     }
   };
 
-  const [isGeneratingSlots, setIsGeneratingSlots] = useState(false);
-  const [ungeneratedPageIndex, setUngeneratedPageIndex] = useState(0);
-  const [unassignedPageIndex, setUnassignedPageIndex] = useState(0);
-  const [generateSlotData, setGenerateSlotData] = useState({
-    siteId: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
-  });
-
-  const handleGenerateSlotsSubmit = async (e: any) => {
-    e.preventDefault();
-    setErrorMsg('');
-    try {
-      const res = await generateSchedules({
-        siteId: generateSlotData.siteId || undefined,
-        startDate: generateSlotData.startDate,
-        endDate: generateSlotData.endDate
-      });
-      setIsGeneratingSlots(false);
-      alert(`Successfully generated ${res.inserted} shift slots!`);
-      loadSchedules();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to generate shift slots');
-    }
-  };
-
-  const [isBatchAssigning, setIsBatchAssigning] = useState(false);
-  const [batchFormData, setBatchFormData] = useState({
-    siteId: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 6 * 86400000).toISOString().split('T')[0],
-    guardId: '',
-    startTime: '08:00',
-    endTime: '20:00'
-  });
-
-  const handleBatchAssignSubmit = async (e: any) => {
-    e.preventDefault();
-    setErrorMsg('');
-    if (!batchFormData.siteId || !batchFormData.guardId) return setErrorMsg('Site and Guard are required');
-    try {
-      const res = await batchAssignGuard(batchFormData);
-      setIsBatchAssigning(false);
-      alert(`Successfully assigned guard to ${res.updatedCount} shift slots!${res.skippedCount > 0 ? ` (${res.skippedCount} skipped due to daily shift limits)` : ''}`);
-      loadSchedules();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to batch assign guard');
-    }
-  };
-
-  const handleAssignGuardSubmit = async (e: any) => {
-    e.preventDefault();
-    setErrorMsg('');
-    if (!formData.guardId) return setErrorMsg('Select a guard first');
-    try {
-      await assignGuard(isAssigning.id, formData.guardId);
-      setIsAssigning(null);
-      alert('Changes saved');
-      loadSchedules();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to assign guard due to constraints');
-    }
-  };
-
-  const filteredSchedules = schedules.filter(s => {
-    let matchesSite = siteFilter === 'All Sites' || s.site?.id === siteFilter;
-    let guardName = formatGuardName(s.guard).toLowerCase();
-    let contractN = (s.site?.contract?.clientCompanyName || '').toLowerCase();
-    let agencyN = (s.guard?.agency?.name || '').toLowerCase();
-    
-    let matchQuery = true;
-    if (searchQuery) {
-      let q = searchQuery.toLowerCase();
-      matchQuery = guardName.includes(q) || contractN.includes(q) || agencyN.includes(q) || formatSiteName(s.site).toLowerCase().includes(q);
-    }
-    
-    let matchDate = true;
-    if (dateFilter && s.date) {
-      matchDate = s.date.startsWith(dateFilter);
-    }
-    
-    return matchesSite && matchQuery && matchDate;
-  });
-
-  // Calculate Shift Coverage Summaries for Ops Managers
-  const unassignedSummaries = (() => {
-    const unassignedShifts = schedules.filter(s => s.guardId == null || s.status === 'Unassigned');
-    if (unassignedShifts.length === 0) return [];
-
-    const groups: { [key: string]: { siteName: string; timing: string; dates: Date[]; count: number } } = {};
-
-    unassignedShifts.forEach(s => {
-      const siteName = formatSiteName(s.site);
-      const timing = s.shiftLabel ? s.shiftLabel.split(' (')[1]?.replace(')', '') || '08:00 - 20:00' : `${s.startTime || '08:00'} - ${s.endTime || '20:00'}`;
-      const key = `${s.siteId}_${timing}`;
-
-      const d = s.date ? new Date(s.date) : new Date();
-
-      if (!groups[key]) {
-        groups[key] = { siteName, timing, dates: [d], count: 1 };
-      } else {
-        groups[key].dates.push(d);
-        groups[key].count++;
-      }
-    });
-
-    return Object.values(groups).map(g => {
-      g.dates.sort((a, b) => a.getTime() - b.getTime());
-      const minD = g.dates[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      const maxD = g.dates[g.dates.length - 1].toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      const dateRangeStr = minD === maxD ? minD : `${minD} - ${maxD}`;
-      return {
-        siteId: g.siteId,
-        siteName: g.siteName,
-        timing: g.timing,
-        dateRange: dateRangeStr,
-        startDateIso: g.dates[0].toISOString().split('T')[0],
-        endDateIso: g.dates[g.dates.length - 1].toISOString().split('T')[0],
-        count: g.count
-      };
-    });
-  })();
-
-  // Calculate Slot Generation Coverage Summaries for Ops Managers (Sites with missing/ungenerated slots)
-  const ungeneratedSlotSummaries = (() => {
-    if (!uniqueSites || uniqueSites.length === 0) return [];
-    
-    // Check coverage for current month
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    
-    // Month start and end
-    const monthStart = new Date(currentYear, currentMonth, 1);
-    const monthEnd = new Date(currentYear, currentMonth + 1, 0);
-
-    const summaries: { siteId: string; siteName: string; missingStartDate: string; missingEndDate: string; dateRange: string }[] = [];
-
-    uniqueSites.forEach((site: any) => {
-      const siteSchedules = schedules.filter(s => s.siteId === site.id);
-      
-      // Determine existing date range generated
-      if (siteSchedules.length === 0) {
-        // No slots generated at all for this site
-        const startStr = monthStart.toISOString().split('T')[0];
-        const endStr = monthEnd.toISOString().split('T')[0];
-        const minD = monthStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        const maxD = monthEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        summaries.push({
-          siteId: site.id,
-          siteName: formatSiteName(site),
-          missingStartDate: startStr,
-          missingEndDate: endStr,
-          dateRange: `${minD} - ${maxD}`
-        });
-      } else {
-        // Find max generated date
-        const generatedDates = siteSchedules.map(s => new Date(s.date).getTime());
-        const maxGenTime = Math.max(...generatedDates);
-        const maxGenDate = new Date(maxGenTime);
-
-        // If max generated date is before month end, slots are missing for remaining days of month
-        if (maxGenDate < monthEnd) {
-          const nextDay = new Date(maxGenDate);
-          nextDay.setDate(nextDay.getDate() + 1);
-          
-          if (nextDay <= monthEnd) {
-            const startStr = nextDay.toISOString().split('T')[0];
-            const endStr = monthEnd.toISOString().split('T')[0];
-            const minD = nextDay.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-            const maxD = monthEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-            summaries.push({
-              siteId: site.id,
-              siteName: formatSiteName(site),
-              missingStartDate: startStr,
-              missingEndDate: endStr,
-              dateRange: `${minD} - ${maxD}`
-            });
-          }
-        }
-      }
-    });
-
-    return summaries;
-  })();
+  const filteredSchedules = schedules.filter(s => siteFilter === 'All Sites' || s.site?.id === siteFilter);
 
   return (
     <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
-      {/* Side-by-Side Operational Summary Banners with Pagination for Ops Managers */}
-      {isOps && (ungeneratedSlotSummaries.length > 0 || unassignedSummaries.length > 0) && (
-        <div className="bg-[#F1F5F9] border-b border-[#E2E8F0] px-6 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            
-            {/* 1. Slot Generation Coverage Summary Panel (Left Column) */}
-            {ungeneratedSlotSummaries.length > 0 ? (
-              <div className="flex flex-col gap-2.5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-[#1E3A5F] flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-700 inline-block"></span>
-                    <span>Slot Generation Coverage ({ungeneratedSlotSummaries.length} {ungeneratedSlotSummaries.length === 1 ? 'Site Missing' : 'Sites Missing'})</span>
-                  </span>
-                  {ungeneratedSlotSummaries.length > 1 && (
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
-                      <button
-                        onClick={() => setUngeneratedPageIndex(prev => Math.max(0, prev - 1))}
-                        disabled={ungeneratedPageIndex === 0}
-                        className="px-2 py-0.5 border rounded bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        ‹
-                      </button>
-                      <span>{ungeneratedPageIndex + 1} / {ungeneratedSlotSummaries.length}</span>
-                      <button
-                        onClick={() => setUngeneratedPageIndex(prev => Math.min(ungeneratedSlotSummaries.length - 1, prev + 1))}
-                        disabled={ungeneratedPageIndex >= ungeneratedSlotSummaries.length - 1}
-                        className="px-2 py-0.5 border rounded bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        ›
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {(() => {
-                  const safeIndex = Math.min(ungeneratedPageIndex, ungeneratedSlotSummaries.length - 1);
-                  const item = ungeneratedSlotSummaries[safeIndex] || ungeneratedSlotSummaries[0];
-                  if (!item) return null;
-                  return (
-                    <div 
-                      onClick={() => {
-                        setGenerateSlotData({
-                          siteId: item.siteId,
-                          startDate: item.missingStartDate,
-                          endDate: item.missingEndDate
-                        });
-                        setIsGeneratingSlots(true);
-                      }}
-                      className="bg-slate-50 border border-slate-300 rounded-lg p-3 flex flex-col justify-between hover:border-[#1E3A5F] cursor-pointer transition-all hover:bg-white group shadow-2xs"
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="font-bold text-[13px] text-[#0F172A] truncate group-hover:text-[#1E3A5F]">{item.siteName}</span>
-                        <span className="bg-slate-200 text-slate-800 border border-slate-300 font-bold text-[11px] px-2 py-0.5 rounded-md whitespace-nowrap">
-                          Slots Not Generated
-                        </span>
-                      </div>
-                      <div className="text-[12px] text-slate-600 mt-2 flex justify-between items-center border-t border-slate-200 pt-2">
-                        <span className="font-medium text-slate-700">Missing Period: {item.dateRange}</span>
-                        <span className="text-[11px] font-bold text-[#1E3A5F] underline">Generate Slots →</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : <div />}
-
-            {/* 2. Unassigned Shift Summary Panel (Right Column) */}
-            {unassignedSummaries.length > 0 ? (
-              <div className="flex flex-col gap-2.5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-[#1E3A5F] flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-700 inline-block"></span>
-                    <span>Unassigned Shift Summary ({unassignedSummaries.reduce((a, b) => a + b.count, 0)} Total Unassigned)</span>
-                  </span>
-                  {unassignedSummaries.length > 1 && (
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
-                      <button
-                        onClick={() => setUnassignedPageIndex(prev => Math.max(0, prev - 1))}
-                        disabled={unassignedPageIndex === 0}
-                        className="px-2 py-0.5 border rounded bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        ‹
-                      </button>
-                      <span>{unassignedPageIndex + 1} / {unassignedSummaries.length}</span>
-                      <button
-                        onClick={() => setUnassignedPageIndex(prev => Math.min(unassignedSummaries.length - 1, prev + 1))}
-                        disabled={unassignedPageIndex >= unassignedSummaries.length - 1}
-                        className="px-2 py-0.5 border rounded bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        ›
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {(() => {
-                  const safeIndex = Math.min(unassignedPageIndex, unassignedSummaries.length - 1);
-                  const item = unassignedSummaries[safeIndex] || unassignedSummaries[0];
-                  if (!item) return null;
-                  return (
-                    <div 
-                      onClick={() => {
-                        setBatchFormData({
-                          siteId: item.siteId || (uniqueSites[0]?.id || ''),
-                          startDate: item.startDateIso || new Date().toISOString().split('T')[0],
-                          endDate: item.endDateIso || new Date().toISOString().split('T')[0],
-                          guardId: '',
-                          startTime: item.timing.split(' - ')[0] || '08:00',
-                          endTime: item.timing.split(' - ')[1] || '20:00'
-                        });
-                        setIsBatchAssigning(true);
-                      }}
-                      className="bg-slate-50 border border-slate-300 rounded-lg p-3 flex flex-col justify-between hover:border-[#1E3A5F] cursor-pointer transition-all hover:bg-white group shadow-2xs"
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="font-bold text-[13px] text-[#0F172A] truncate group-hover:text-[#1E3A5F]">{item.siteName}</span>
-                        <span className="bg-slate-200 text-slate-800 border border-slate-300 font-bold text-[11px] px-2 py-0.5 rounded-md whitespace-nowrap">
-                          {item.count} {item.count === 1 ? 'Shift Unassigned' : 'Shifts Unassigned'}
-                        </span>
-                      </div>
-                      <div className="text-[12px] text-slate-600 mt-2 flex justify-between items-center border-t border-slate-200 pt-2">
-                        <span className="font-medium text-slate-700">Time: {item.timing}</span>
-                        <span className="font-medium text-slate-500">Period: {item.dateRange}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : <div />}
-
-          </div>
-        </div>
-      )}
-
-      <div className="px-6 py-4 border-b border-[#E2E8F0] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#F8FAFC]">
+      <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
         <div>
           <h2 className="text-[18px] font-semibold font-serif text-[#1E3A5F]">Shift Schedules</h2>
           <p className="text-[13px] text-gray-500">Assign and monitor daily patrol rotations.</p>
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <input
-            type="text"
-            placeholder="Search guard, agency, client..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-[#0F172A] outline-none flex-1 min-w-[300px] sm:min-w-[400px]"
-          />
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={e => setDateFilter(e.target.value)}
-            className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-[#0F172A] outline-none"
-          />
+        <div className="flex gap-4 items-center">
           <select
             value={siteFilter}
             onChange={e => setSiteFilter(e.target.value)}
@@ -1782,16 +1364,10 @@ function Schedules({ role }: { role?: string }) {
           </select>
           <div className="flex bg-gray-200 p-1 rounded">
             <button
-              onClick={() => setViewMode('monthly')}
-              className={`px-3 py-1 text-[13px] font-medium rounded ${viewMode === 'monthly' ? 'bg-white shadow-sm text-[#1E3A5F]' : 'text-gray-500'}`}
-            >
-              Monthly
-            </button>
-            <button
               onClick={() => setViewMode('calendar')}
               className={`px-3 py-1 text-[13px] font-medium rounded ${viewMode === 'calendar' ? 'bg-white shadow-sm text-[#1E3A5F]' : 'text-gray-500'}`}
             >
-              Weekly
+              Calendar
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -1801,38 +1377,14 @@ function Schedules({ role }: { role?: string }) {
             </button>
           </div>
           {isOps && (
-            <>
-              <button 
-                onClick={() => setIsGeneratingSlots(true)} 
-                className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors"
-              >
-                + Generate Shift Slots
-              </button>
-              <button 
-                onClick={() => {
-                  setBatchFormData({
-                    siteId: siteFilter !== 'All Sites' ? siteFilter : (uniqueSites[0]?.id || ''),
-                    startDate: new Date().toISOString().split('T')[0],
-                    endDate: new Date(Date.now() + 6 * 86400000).toISOString().split('T')[0],
-                    guardId: '',
-                    startTime: '08:00',
-                    endTime: '20:00'
-                  });
-                  setIsBatchAssigning(true);
-                }}
-                className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors"
-              >
-                + Batch Assign (Date Range)
-              </button>
-              <button onClick={openCreateRoster} className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors">
-                + Assign Post
-              </button>
-            </>
+            <button onClick={openCreateRoster} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
+              + Assign Permanent Post
+            </button>
           )}
         </div>
       </div>
 
-      {viewMode === 'list' && (
+      {viewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -1863,22 +1415,12 @@ function Schedules({ role }: { role?: string }) {
                       </span>
                     </td>
                     {isOps && (
-                      <td className="px-6 py-4 flex gap-2 border-b-0 items-center h-[52px]">
-                        {sched.status === 'Unassigned' ? (
-                          <>
-                            <button onClick={() => { setFormData({...defaultFormData}); setIsAssigning(sched); }} className="px-3 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[12px] font-medium hover:bg-green-100">Assign Guard</button>
-                            <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
-                          </>
-                        ) : (
-                          <>
-                            {sched.status?.includes('Permanent') && (
-                              <button onClick={() => handleDeleteRoster(sched.rosterId)} className="text-[13px] text-red-600 hover:underline">Delete Post</button>
-                            )}
-                            <button onClick={() => openCreateException(sched)} className="text-[13px] text-blue-600 hover:underline">Override</button>
-                            <button onClick={() => { setFormData({...defaultFormData}); setIsAssigning(sched); }} className="text-[13px] text-orange-600 hover:underline">Reassign</button>
-                            <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
-                          </>
+                      <td className="px-6 py-4 flex gap-2">
+                        {sched.status?.includes('Permanent') && (
+                          <button onClick={() => handleDeleteRoster(sched.rosterId)} className="text-[13px] text-red-600 hover:underline">Delete Post</button>
                         )}
+                        <button onClick={() => openCreateException(sched)} className="text-[13px] text-blue-600 hover:underline">Override</button>
+                        <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
                       </td>
                     )}
                   </tr>
@@ -1887,183 +1429,42 @@ function Schedules({ role }: { role?: string }) {
             </tbody>
           </table>
         </div>
-      )}
-
-      {viewMode === 'calendar' && (
-        <div className="p-6 bg-[#F8FAFC] overflow-x-auto">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-[14px] font-bold text-[#1E3A5F]">
-              Week of {currentWeekStart.toLocaleDateString()} - {new Date(currentWeekStart.getTime() + 6 * 86400000).toLocaleDateString()}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const prev = new Date(currentWeekStart);
-                  prev.setDate(prev.getDate() - 7);
-                  setCurrentWeekStart(prev);
-                }}
-                className="px-3 py-1 bg-white border rounded text-[12px] font-medium text-gray-700 hover:bg-gray-50"
-              >
-                ← Prev Week
-              </button>
-              <button
-                onClick={() => {
-                  const today = new Date();
-                  today.setDate(today.getDate() - today.getDay());
-                  setCurrentWeekStart(today);
-                }}
-                className="px-3 py-1 bg-white border rounded text-[12px] font-medium text-gray-700 hover:bg-gray-50"
-              >
-                This Week
-              </button>
-              <button
-                onClick={() => {
-                  const next = new Date(currentWeekStart);
-                  next.setDate(next.getDate() + 7);
-                  setCurrentWeekStart(next);
-                }}
-                className="px-3 py-1 bg-white border rounded text-[12px] font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Next Week →
-              </button>
-            </div>
-          </div>
+      ) : (
+        <div className="p-6 overflow-x-auto bg-[#F8FAFC]">
           <div className="grid grid-cols-7 gap-4 min-w-[1000px]">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} className="font-bold text-center text-[#1E3A5F] border-b pb-2">{d}</div>
-            ))}
-            {Array.from({ length: 7 }).map((_, i) => {
-              const d = new Date(currentWeekStart);
-              d.setDate(d.getDate() + i);
-              const year = d.getFullYear();
-              const month = String(d.getMonth() + 1).padStart(2, '0');
-              const day = String(d.getDate()).padStart(2, '0');
-              const dStr = `${year}-${month}-${day}`;
-              
-              const dayS = filteredSchedules.filter(s => {
-                if (!s.date) return false;
-                const sDate = new Date(s.date);
-                const sY = sDate.getFullYear();
-                const sM = String(sDate.getMonth() + 1).padStart(2, '0');
-                const sD = String(sDate.getDate()).padStart(2, '0');
-                return `${sY}-${sM}-${sD}` === dStr;
-              });
-              
+            {weekDays.map(day => {
+              const dayStr = day.toISOString().split('T')[0];
+              // Make sure we match on the scheduled date segment properly
+              const daySchedules = filteredSchedules.filter(s => s.date?.startsWith(dayStr));
+              const isToday = dayStr === new Date().toISOString().split('T')[0];
+
               return (
-                <div key={i} className="min-h-[160px] border rounded bg-white p-2 flex flex-col">
-                  <div className="text-[12px] font-semibold text-gray-600 mb-2 border-b pb-1 flex justify-between">
-                    <span>{d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                    {dayS.some(s => s.guardId == null || s.status === 'Unassigned') && (
-                      <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">Needs Guard</span>
-                    )}
+                <div key={dayStr} className={`relative bg-white border text-[13px] rounded shadow-sm min-h-[300px] mt-2 ${isToday ? 'border-blue-200 shadow-md' : 'border-[#E2E8F0]'}`}>
+                  {isToday && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10">
+                      <span className="text-[9px] font-bold bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-sm tracking-widest uppercase">Today</span>
+                    </div>
+                  )}
+                  <div className="bg-[#1E3A5F] text-white p-2 text-center font-semibold rounded-t">
+                    {day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </div>
-                  <div className="space-y-2 flex flex-col flex-1">
-                    {dayS.length === 0 ? (
-                      <span className="text-[11px] text-gray-300 text-center my-auto">No Shifts</span>
-                    ) : (
-                      dayS.map(sched => {
-                        const isUnassigned = sched.guardId == null || sched.status === 'Unassigned';
-                        return (
-                          <div key={sched.id} className={`text-[11px] p-2 rounded border flex flex-col gap-1 ${isUnassigned ? 'bg-amber-50/60 border-amber-200' : 'bg-blue-50 border-blue-100'}`}>
-                            <span className="font-bold text-[#1E3A5F]">{sched.shiftLabel}</span>
-                            <span className="text-gray-600 truncate">{formatSiteName(sched.site)}</span>
-                            {isUnassigned ? (
-                              <button
-                                onClick={() => { setFormData({ ...defaultFormData }); setIsAssigning(sched); }}
-                                className="mt-1 bg-emerald-600 text-white text-[11px] font-bold py-1 px-2 rounded hover:bg-emerald-700 transition-colors shadow-sm"
-                              >
-                                + Assign Guard
-                              </button>
-                            ) : (
-                              <span className="font-medium text-emerald-800 flex items-center gap-1">
-                                ✓ {formatGuardName(sched.guard)}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
+                  <div className={`p-2 flex flex-col gap-2 ${isToday ? 'bg-slate-50 min-h-[calc(100%-36px)]' : ''}`}>
+                    {daySchedules.length === 0 ? <div className="text-gray-400 text-center mt-4 text-[12px]">No Shifts</div> : daySchedules.map(sched => (
+                      <div key={sched.id} onClick={() => { if (isOps) openCreateException(sched); }} className={`border p-2 rounded group ${isOps ? 'cursor-pointer' : ''} transition-colors ${sched.status?.includes('Absent') ? 'bg-red-50 border-red-200 hover:bg-red-100' : (sched.status?.includes('Swap') ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' : 'bg-blue-50 border-blue-100 hover:bg-blue-100')}`}>
+                        <div className="flex justify-between items-start">
+                          <p className="font-bold text-[#1E3A5F] text-[12px]">
+                            {sched.startTime} - {sched.endTime}
+                          </p>
+                          {sched.status?.includes('Swap') && <span className="text-[9px] bg-orange-200 text-orange-800 px-1 rounded">SWAP</span>}
+                          {sched.status?.includes('Absent') && <span className="text-[9px] bg-red-200 text-red-800 px-1 rounded">ABSENT</span>}
+                        </div>
+                        <p className="text-gray-600 truncate text-[11px] mt-1">{formatGuardName(sched.guard)}</p>
+                        <p className="text-gray-500 truncate text-[11px]">{formatSiteName(sched.site)}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
-            })}
-          </div>
-        </div>
-      )}
-
-      {viewMode === 'monthly' && (
-        <div className="p-6 bg-[#F8FAFC]">
-          <div className="grid grid-cols-7 gap-3 min-w-[1000px]">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} className="font-bold text-center text-[#1E3A5F] text-[13px] py-1">{d}</div>
-            ))}
-            {/* Generate 35 days for monthly grid */}
-            {Array.from({ length: 35 }).map((_, i) => {
-               const d = new Date();
-               d.setDate(d.getDate() - d.getDay() + i); // Start from previous Sunday
-               const year = d.getFullYear();
-               const month = String(d.getMonth() + 1).padStart(2, '0');
-               const day = String(d.getDate()).padStart(2, '0');
-               const dStr = `${year}-${month}-${day}`;
-               
-               const dayS = filteredSchedules.filter(s => {
-                 if (!s.date) return false;
-                 const sDate = new Date(s.date);
-                 const sY = sDate.getFullYear();
-                 const sM = String(sDate.getMonth() + 1).padStart(2, '0');
-                 const sD = String(sDate.getDate()).padStart(2, '0');
-                 return `${sY}-${sM}-${sD}` === dStr;
-               });
-
-               const todayStr = (() => {
-                 const t = new Date();
-                 return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-               })();
-               const isToday = dStr === todayStr;
-               const unassigned = dayS.filter(s => s.guardId == null || s.status === 'Unassigned').length;
-               const totalSites = Array.from(new Set(dayS.map(s => s.siteId))).length;
-               
-               const handleDayClick = () => {
-                 const weekStart = new Date(d);
-                 weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-                 setCurrentWeekStart(weekStart);
-                 setViewMode('calendar');
-               };
-
-               return (
-                 <div
-                   key={i}
-                   onClick={handleDayClick}
-                   className={`border rounded-xl h-[105px] flex flex-col p-2.5 bg-white cursor-pointer hover:border-blue-500 hover:shadow-lg transition-all relative overflow-hidden group ${isToday ? 'ring-2 ring-blue-500 bg-blue-50/10' : 'border-gray-200'}`}
-                 >
-                   <div className="flex justify-between items-center">
-                     <span className={`text-[13px] font-bold ${isToday ? 'text-blue-600 bg-blue-100 px-1.5 rounded' : 'text-gray-700'}`}>{d.getDate()}</span>
-                     {dayS.length > 0 && (
-                       <span className={`w-2 h-2 rounded-full ${unassigned > 0 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                     )}
-                   </div>
-
-                   {dayS.length > 0 ? (
-                     <div className="flex flex-col gap-1 mt-auto">
-                       <div className="text-[11px] text-gray-500 font-medium truncate">
-                         {totalSites} {totalSites === 1 ? 'Site' : 'Sites'} • {dayS.length} {dayS.length === 1 ? 'Shift' : 'Shifts'}
-                       </div>
-                       {unassigned > 0 ? (
-                         <div className="bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex justify-between items-center shadow-2xs group-hover:bg-red-100 transition-colors">
-                           <span>Missing: {unassigned}</span>
-                           <span className="text-[10px]">Assign →</span>
-                         </div>
-                       ) : (
-                         <div className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                           ✓ Fully Covered
-                         </div>
-                       )}
-                     </div>
-                   ) : (
-                     <span className="text-[11px] text-gray-300 mt-auto text-center font-normal">No Activity</span>
-                   )}
-                 </div>
-               );
             })}
           </div>
         </div>
@@ -2172,240 +1573,12 @@ function Schedules({ role }: { role?: string }) {
           </form>
         </div>
       )}
-
-      {isGeneratingSlots && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-start justify-center pt-16 p-4">
-          <form onSubmit={handleGenerateSlotsSubmit} className="bg-white rounded-lg shadow-2xl w-[480px] overflow-visible flex flex-col border border-gray-200">
-            <div className="px-6 py-4 border-b bg-slate-100">
-              <h3 className="text-lg font-semibold text-[#1E3A5F]">Generate Shift Slots (Date Range)</h3>
-              <p className="text-[13px] text-slate-600 mt-1">Generate unassigned shift slots for contract sites across your specified period.</p>
-            </div>
-            <div className="p-6 space-y-4">
-              {errorMsg && <div className="text-red-600 text-sm font-medium">{errorMsg}</div>}
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 mb-1">Target Contract Site (Optional)</label>
-                <select
-                  value={generateSlotData.siteId}
-                  onChange={e => setGenerateSlotData({ ...generateSlotData, siteId: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
-                >
-                  <option value="">All Contract Sites</option>
-                  {uniqueSites.map((s: any) => (
-                    <option key={s.id} value={s.id}>{formatSiteName(s)}</option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-gray-500 mt-1">Leave as "All Contract Sites" to generate slots for all active locations.</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={generateSlotData.startDate}
-                    onChange={e => setGenerateSlotData({ ...generateSlotData, startDate: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={generateSlotData.endDate}
-                    onChange={e => setGenerateSlotData({ ...generateSlotData, endDate: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
-              <button type="button" onClick={() => setIsGeneratingSlots(false)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
-              <button type="submit" className="bg-[#1E3A5F] px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-[#162D4A] shadow-sm transition-colors">Generate Shift Slots</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {isBatchAssigning && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-start justify-center pt-16 p-4">
-          <form onSubmit={handleBatchAssignSubmit} className="bg-white rounded-lg shadow-2xl w-[480px] overflow-visible flex flex-col border border-gray-200">
-            <div className="px-6 py-4 border-b bg-slate-100">
-              <h3 className="text-lg font-semibold text-[#1E3A5F]">Batch Assign Guard (Date Range)</h3>
-              <p className="text-[13px] text-slate-600 mt-1">Assign a guard across multiple dates in a single action.</p>
-            </div>
-            <div className="p-6 space-y-4">
-              {errorMsg && <div className="text-red-600 text-sm font-medium">{errorMsg}</div>}
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 mb-1">Contract Site</label>
-                <select
-                  value={batchFormData.siteId}
-                  onChange={e => {
-                    const newSiteId = e.target.value;
-                    const site = uniqueSites.find((s: any) => s.id === newSiteId);
-                    const defaultShift = site?.shiftTimings?.[0] ? `${site.shiftTimings[0].start} - ${site.shiftTimings[0].end}` : '';
-                    const defaultStart = site?.shiftTimings?.[0]?.start || '08:00';
-                    const defaultEnd = site?.shiftTimings?.[0]?.end || '20:00';
-                    setBatchFormData({
-                      ...batchFormData,
-                      siteId: newSiteId,
-                      startTime: defaultStart,
-                      endTime: defaultEnd
-                    });
-                  }}
-                  className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
-                  required
-                >
-                  <option value="">Select a Site</option>
-                  {uniqueSites.map((s: any) => (
-                    <option key={s.id} value={s.id}>{formatSiteName(s)}</option>
-                  ))}
-                </select>
-              </div>
-
-              {batchFormData.siteId && (() => {
-                const site = uniqueSites.find((s: any) => s.id === batchFormData.siteId);
-                const timings = site?.shiftTimings || [];
-                return (
-                  <div>
-                    <label className="block text-[13px] font-medium text-gray-700 mb-1">Select Shift Time</label>
-                    <select
-                      value={`${batchFormData.startTime} - ${batchFormData.endTime}`}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (!val) {
-                          setBatchFormData({ ...batchFormData, startTime: '', endTime: '' });
-                        } else {
-                          const [sTime, eTime] = val.split(' - ');
-                          setBatchFormData({ ...batchFormData, startTime: sTime, endTime: eTime });
-                        }
-                      }}
-                      className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
-                    >
-                      <option value="">All Shifts / Any Shift Time</option>
-                      {timings.map((t: any, i: number) => (
-                        <option key={i} value={`${t.start} - ${t.end}`}>
-                          {t.label ? `${t.label} (${t.start} - ${t.end})` : `${t.start} - ${t.end}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })()}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={batchFormData.startDate}
-                    onChange={e => setBatchFormData({ ...batchFormData, startDate: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={batchFormData.endDate}
-                    onChange={e => setBatchFormData({ ...batchFormData, endDate: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 mb-1">Guard to Assign</label>
-                <select
-                  value={batchFormData.guardId}
-                  onChange={e => setBatchFormData({ ...batchFormData, guardId: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
-                  required
-                >
-                  <option value="">Select a Guard</option>
-                  {guards.map((g: any) => (
-                    <option key={g.id} value={g.id}>
-                      {g.firstName} {g.lastName} ({g.guardId}) {g.agency?.name ? `— ${g.agency.name}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
-              <button type="button" onClick={() => setIsBatchAssigning(false)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
-              <button type="submit" className="bg-[#1E3A5F] px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-[#162D4A] shadow-sm transition-colors">Confirm Batch Assignment</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {isAssigning && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-start justify-center pt-24 p-4">
-          <form onSubmit={handleAssignGuardSubmit} className="bg-white rounded-lg shadow-2xl w-[420px] overflow-visible flex flex-col border border-gray-200">
-            <div className="px-6 py-4 border-b bg-emerald-50/80">
-              <h3 className="text-lg font-semibold text-emerald-900">Assign Guard to Shift</h3>
-              <p className="text-[13px] text-emerald-700 mt-1">{isAssigning.shiftLabel} • {formatSiteName(isAssigning.site)}</p>
-            </div>
-            <div className="p-6 space-y-4 min-h-[160px]">
-              {errorMsg && <div className="text-red-600 text-sm font-medium">{errorMsg}</div>}
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 mb-1.5">Select Guard</label>
-                <select
-                  value={formData.guardId}
-                  onChange={e => setFormData({ ...formData, guardId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shadow-sm"
-                  required
-                >
-                  <option value="">Choose a guard...</option>
-                  {(() => {
-                    const shiftStartHour = parseInt(isAssigning.startTime?.split(':')[0] || '8', 10);
-                    const targetShiftType = (shiftStartHour >= 6 && shiftStartHour < 18) ? 'Day' : 'Night';
-
-                    const matching = guards.filter((g: any) => !g.shiftPreference || g.shiftPreference === 'Flexible' || g.shiftPreference === targetShiftType);
-                    const nonMatching = guards.filter((g: any) => g.shiftPreference && g.shiftPreference !== 'Flexible' && g.shiftPreference !== targetShiftType);
-
-                    return (
-                      <>
-                        <optgroup label={`⭐ Recommended (${targetShiftType} / Flexible)`}>
-                          {matching.map((g: any) => (
-                            <option key={g.id} value={g.id}>
-                              {g.firstName} {g.lastName} ({g.guardId}) • {g.shiftPreference || 'Flexible'}
-                            </option>
-                          ))}
-                        </optgroup>
-                        {nonMatching.length > 0 && (
-                          <optgroup label="Other Guards">
-                            {nonMatching.map((g: any) => (
-                              <option key={g.id} value={g.id}>
-                                {g.firstName} {g.lastName} ({g.guardId}) • {g.shiftPreference}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </>
-                    );
-                  })()}
-                </select>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
-              <button type="button" onClick={() => setIsAssigning(null)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
-              <button type="submit" className="bg-emerald-600 px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors">Assign Guard</button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }
 
 function Logs({ role }: { role?: string }) {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'incidents'>('attendance');
   const [logs, setLogs] = useState<any[]>([]);
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [siteFilter, setSiteFilter] = useState('All Sites');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -2413,15 +1586,10 @@ function Logs({ role }: { role?: string }) {
   const [resolutionNote, setResolutionNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const loadLogs = () => {
-    fetchLogs().then(data => setLogs(Array.isArray(data) ? data : [])).catch(console.error);
-    fetchAttendanceLogs().then(data => setAttendanceLogs(Array.isArray(data) ? data : [])).catch(console.error);
-  };
+  const loadLogs = () => fetchLogs().then(setLogs).catch(console.error);
 
   useEffect(() => {
     loadLogs();
-    const interval = setInterval(loadLogs, 15000); // Polling every 15s for live updates
-    return () => clearInterval(interval);
   }, []);
 
   const handleResolveSubmit = async (e: any) => {
@@ -2439,23 +1607,9 @@ function Logs({ role }: { role?: string }) {
 
   const isOps = role === 'OPERATION_MANAGER' || !role;
 
-  const safeLogs = Array.isArray(logs) ? logs : [];
-  const safeAttendance = Array.isArray(attendanceLogs) ? attendanceLogs : [];
+  const uniqueSites = Array.from(new Set(logs.map(log => log.mapPin?.patrolPath?.site?.name).filter(Boolean)));
 
-  const uniqueSites = Array.from(new Set([
-    ...safeLogs.map(log => log.mapPin?.patrolPath?.site?.name),
-    ...safeAttendance.map(a => a.roster?.site?.name)
-  ].filter(Boolean)));
-
-  const filteredAttendance = safeAttendance.filter(a => {
-    const matchesSite = siteFilter === 'All Sites' || a.roster?.site?.name === siteFilter;
-    const guardName = a.guard ? `${a.guard.firstName} ${a.guard.lastName}`.toLowerCase() : '';
-    const siteName = (a.roster?.site?.name || '').toLowerCase();
-    const matchesSearch = guardName.includes(searchQuery.toLowerCase()) || siteName.includes(searchQuery.toLowerCase());
-    return matchesSite && matchesSearch;
-  });
-
-  const filteredLogs = safeLogs.filter(l => {
+  const filteredLogs = logs.filter(l => {
     if (role === 'CLIENT' && l.description?.includes('DEBUG')) return false;
     const matchesSite = siteFilter === 'All Sites' || l.mapPin?.patrolPath?.site?.name === siteFilter;
     const guardName = l.guard ? `${l.guard.firstName} ${l.guard.lastName}`.toLowerCase() : 'system';
@@ -2466,36 +1620,21 @@ function Logs({ role }: { role?: string }) {
   });
 
   return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm">
-      <div className="px-6 py-4 border-b border-[#E2E8F0] flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-[#F8FAFC]">
+    <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
+      <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
         <div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setActiveTab('attendance')}
-              className={`text-[15px] font-bold pb-0.5 border-b-2 transition-colors ${activeTab === 'attendance' ? 'text-[#1E3A5F] border-[#1E3A5F]' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
-            >
-              Live Guard Attendance
-            </button>
-            <span className="text-gray-300">|</span>
-            <button
-              onClick={() => setActiveTab('incidents')}
-              className={`text-[15px] font-bold pb-0.5 border-b-2 transition-colors ${activeTab === 'incidents' ? 'text-[#1E3A5F] border-[#1E3A5F]' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
-            >
-              Patrol & Incident Logs
-            </button>
-          </div>
-          <p className="text-[12px] text-gray-500 mt-1">
-            {activeTab === 'attendance' ? 'Real-time guard check-ins and arrival punctuality stream.' : 'Real-time audit trail of field activities and security alerts.'}
-          </p>
+          <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Incident Logs</h2>
+          <p className="text-[13px] text-gray-500">Real-time audit trail of field activities.</p>
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex gap-2 relative">
           <input
             type="text"
-            placeholder="Search guard or site..."
+            placeholder="Search guard, location, text..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-[#0F172A] outline-none focus:border-[#1E3A5F] w-[200px]"
+            className="border border-[#E2E8F0] rounded pl-8 pr-3 py-1.5 text-[13px] text-[#0F172A] outline-none focus:border-[#1E3A5F] w-[200px]"
           />
+          <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2" />
           <select
             value={siteFilter}
             onChange={e => setSiteFilter(e.target.value)}
@@ -2506,121 +1645,59 @@ function Logs({ role }: { role?: string }) {
           </select>
         </div>
       </div>
-
       <div className="overflow-x-auto">
-        {activeTab === 'attendance' ? (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                <th className="px-6 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Arrival Time</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Guard</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Site & Shift</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Arrival Status</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Check-In Location (GPS)</th>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-[#F8FAFC]">
+              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Timestamp</th>
+              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Type</th>
+              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Description</th>
+              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Personnel</th>
+              <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status / Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLogs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-[13px] text-gray-500">No logs match your filters.</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredAttendance.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-400 font-medium">No real-time guard check-ins recorded yet.</td>
-                </tr>
-              ) : (
-                filteredAttendance.map(item => (
-                  <tr key={item.id} className="hover:bg-[#F8FAFC] border-b border-gray-100">
-                    <td className="px-6 py-4 text-[13px] text-[#0F172A] font-medium">
-                      {item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-[13px] text-[#0F172A]">
-                        {item.guard ? `${item.guard.firstName || ''} ${item.guard.lastName || ''}`.trim() || 'Unknown Guard' : 'Unknown Guard'}
+            ) : (
+              filteredLogs.map(log => (
+                <tr key={log.id} className="hover:bg-[#F8FAFC] border-b border-gray-100">
+                  <td className="px-6 py-4 text-[13px] text-gray-600">{new Date(log.timestamp).toLocaleString()}</td>
+                  <td className="px-6 py-4">
+                    {log.isIncident ? (
+                      <span className="text-[14px] font-medium text-[#C53030]">Incident</span>
+                    ) : (
+                      <span className="text-[14px] text-green-700">Routine</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-[14px] text-[#0F172A]">
+                    {log.description || 'No description provided.'}
+                    <span className="ml-1 text-[13px] text-gray-400">
+                      {log.mapPin ? `(@ ${log.mapPin.name}${log.mapPin.patrolPath?.site ? `, ${log.mapPin.patrolPath.site.name}` : ''})` : ''}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-[13px] text-gray-700 font-medium">{log.guard ? `${log.guard.firstName} ${log.guard.lastName}` : 'System'}</td>
+                  <td className="px-6 py-4">
+                    {log.resolved ? (
+                      <div>
+                        <span className="text-[13px] text-green-700 font-medium flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Resolved</span>
+                        {log.resolutionNote && <p className="text-[11px] text-gray-500 mt-1 max-w-[200px] truncate" title={log.resolutionNote}>Note: {log.resolutionNote}</p>}
                       </div>
-                      <div className="text-[11px] text-gray-400 font-mono">
-                        {item.guard?.guardId || 'N/A'} {item.guard?.agency ? `• ${item.guard.agency.name}` : ''}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-[13px] text-[#1E3A5F]">{item.roster?.site?.name || 'Unassigned Site'}</div>
-                      <div className="text-[12px] text-gray-500">{item.roster?.shiftLabel || 'Shift'} ({item.roster?.startTime || ''} - {item.roster?.endTime || ''})</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {(() => {
-                        const s = (item.status || 'On Time').toLowerCase();
-                        const isOnTime = s.includes('on') || s.includes('time');
-                        return (
-                          <span className={`inline-block px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${isOnTime ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
-                            {item.status || 'On Time'}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 text-[12px] text-gray-500 font-mono">
-                      {typeof item.latitude === 'number' && typeof item.longitude === 'number' ? (
-                        <a href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                          📍 {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
-                        </a>
+                    ) : (
+                      log.isIncident ? (
+                        isOps ? <button onClick={() => setIsResolving(log)} className="text-[12px] bg-blue-50 text-blue-600 px-3 py-1 rounded font-medium hover:bg-blue-100 border border-blue-200">Resolve</button> : <span className="text-[13px] text-orange-600 font-medium">Unresolved</span>
                       ) : (
-                        <span className="text-gray-400">Site Mobile Check-in</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#F8FAFC]">
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Timestamp</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Type</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Description</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Personnel</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280]">Status / Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-500">No logs match your filters.</td>
+                        <span className="text-[13px] text-gray-400">N/A</span>
+                      )
+                    )}
+                  </td>
                 </tr>
-              ) : (
-                filteredLogs.map(log => (
-                  <tr key={log.id} className="hover:bg-[#F8FAFC] border-b border-gray-100">
-                    <td className="px-6 py-4 text-[13px] text-gray-600">{new Date(log.timestamp).toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      {log.isIncident ? (
-                        <span className="text-[14px] font-medium text-[#C53030]">Incident</span>
-                      ) : (
-                        <span className="text-[14px] text-green-700">Routine</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-[14px] text-[#0F172A]">
-                      {log.description || 'No description provided.'}
-                      <span className="ml-1 text-[13px] text-gray-400">
-                        {log.mapPin ? `(@ ${log.mapPin.name}${log.mapPin.patrolPath?.site ? `, ${log.mapPin.patrolPath.site.name}` : ''})` : ''}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-[13px] text-gray-700 font-medium">{log.guard ? `${log.guard.firstName} ${log.guard.lastName}` : 'System'}</td>
-                    <td className="px-6 py-4">
-                      {log.resolved ? (
-                        <div>
-                          <span className="text-[13px] text-green-700 font-medium flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Resolved</span>
-                          {log.resolutionNote && <p className="text-[11px] text-gray-500 mt-1 max-w-[200px] truncate" title={log.resolutionNote}>Note: {log.resolutionNote}</p>}
-                        </div>
-                      ) : (
-                        log.isIncident ? (
-                          isOps ? <button onClick={() => setIsResolving(log)} className="text-[12px] bg-blue-50 text-blue-600 px-3 py-1 rounded font-medium hover:bg-blue-100 border border-blue-200">Resolve</button> : <span className="text-[13px] text-orange-600 font-medium">Unresolved</span>
-                        ) : (
-                          <span className="text-[13px] text-gray-400">N/A</span>
-                        )
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {isResolving && (
@@ -2664,12 +1741,6 @@ function Reports({ role }: { role?: string }) {
   const [stats, setStats] = useState<any>(null);
   const [guards, setGuards] = useState<any[]>([]);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [agencyFilter, setAgencyFilter] = useState('All');
-  const [siteFilter, setSiteFilter] = useState('All Sites');
-
   const formatGuardName = (g: any) => {
     if (role === 'CLIENT') return `${g.firstName || 'Unknown'} ${g.lastName?.[0] || '?'}.`;
     return `${g.firstName || ''} ${g.lastName || ''}`.trim() || 'Unknown Guard';
@@ -2677,11 +1748,8 @@ function Reports({ role }: { role?: string }) {
 
   useEffect(() => {
     fetchReportsOverview().then(setStats).catch(console.error);
+    fetchGuardPerformance().then(setGuards).catch(console.error);
   }, []);
-
-  useEffect(() => {
-    fetchGuardPerformance(dateFrom, dateTo, siteFilter).then(setGuards).catch(console.error);
-  }, [dateFrom, dateTo, siteFilter]);
 
   const chartData = useMemo(() => {
     if (!stats?.incidentFrequency) return [];
@@ -2691,21 +1759,8 @@ function Reports({ role }: { role?: string }) {
     }));
   }, [stats]);
 
-  const filteredGuards = useMemo(() => {
-    return guards.filter(g => {
-      const gName = (g.firstName + ' ' + g.lastName).toLowerCase();
-      const agencyName = (g.agency?.name || 'In-House').toLowerCase();
-      const matchesSearch = gName.includes(searchQuery.toLowerCase()) || g.guardId.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesAgency = agencyFilter === 'All' || g.agency?.name === agencyFilter;
-      // Note: time/date mapping in simple guard objects isn't directly present without rosters, we simulate filtering visually
-      return matchesSearch && matchesAgency;
-    });
-  }, [guards, searchQuery, agencyFilter]);
-
-  const uniqueAgencies = Array.from(new Set(guards.map(g => g.agency?.name).filter(Boolean)));
-
   const exportReport = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredGuards.map(g => ({
+    const ws = XLSX.utils.json_to_sheet(guards.map(g => ({
       'Guard ID': role === 'CLIENT' ? 'HIDDEN' : g.guardId,
       'Name': formatGuardName(g),
       'Agency': g.agency?.name || 'In-House',
@@ -2720,45 +1775,14 @@ function Reports({ role }: { role?: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start gap-8">
-        <div className="flex-shrink-0">
+      <div className="flex justify-between items-start">
+        <div>
           <h2 className="text-[24px] font-bold text-[#1E3A5F]">Performance Analytics</h2>
           <p className="text-[14px] text-[#6B7280] mt-1">Live metrics, incident frequency, and guard duty evaluations.</p>
         </div>
-        <div className="flex flex-1 gap-2 items-center flex-wrap justify-end">
-          <input
-            type="text"
-            placeholder="Search guard or ID..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none focus:border-[#1E3A5F] flex-1 max-w-[600px]"
-          />
-          <div className="flex gap-1 items-center bg-gray-50 border rounded px-2">
-            <span className="text-[11px] text-gray-500 font-medium">Dates:</span>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent border-none outline-none text-[12px] p-1 text-gray-700 w-[105px]"/>
-            <span className="text-gray-400 text-[10px]">to</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent border-none outline-none text-[12px] p-1 text-gray-700 w-[105px]"/>
-          </div>
-          <select
-            value={siteFilter}
-            onChange={e => setSiteFilter(e.target.value)}
-            className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-gray-600 outline-none focus:border-[#1E3A5F]"
-          >
-            <option value="All Sites">All Sites</option>
-            {Object.keys(stats?.incidentFrequency || {}).map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select
-            value={agencyFilter}
-            onChange={e => setAgencyFilter(e.target.value)}
-            className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-gray-600 outline-none"
-          >
-            <option value="All">All Agencies</option>
-            {uniqueAgencies.map((a: any) => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <button onClick={exportReport} className="flex items-center gap-2 bg-[#1E3A5F] px-4 py-2 text-[13px] text-white font-medium rounded hover:bg-[#162D4A] transition-colors">
-            <Download className="w-4 h-4" /> Export XLSX
-          </button>
-        </div>
+        <button onClick={exportReport} className="flex items-center gap-2 bg-[#1E3A5F] px-4 py-2 text-[13px] text-white font-medium rounded hover:bg-[#162D4A] transition-colors">
+          <Download className="w-4 h-4" /> Export XLSX
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -2777,77 +1801,53 @@ function Reports({ role }: { role?: string }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Guard Attendance & Arrival Punctuality by Site */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-[14px] font-bold text-[#1E3A5F] uppercase tracking-wide">Guard Attendance Breakdown By Site</h3>
-              <p className="text-[12px] text-[#6B7280] mt-0.5">On-time arrivals, late check-ins, and absences</p>
-            </div>
-            <div className="flex gap-4 text-[11px] font-medium text-[#475569]">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#1E3A5F]"></span> On-Time</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#64748B]"></span> Late</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#CBD5E1]"></span> Absent</span>
-            </div>
-          </div>
-          {(stats?.siteAttendanceData?.length || 0) > 0 ? (
+          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-6">Incident Frequency By Site</h3>
+          {chartData.length > 0 ? (
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.siteAttendanceData}>
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="site" tick={{ fontSize: 11, fill: '#475569', fontWeight: 500 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#475569', fontWeight: 500 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: 6, border: '1px solid #E2E8F0', fontSize: 12, fontWeight: 500 }} />
-                  <Bar dataKey="onTime" name="On-Time" fill="#1E3A5F" radius={[2, 2, 0, 0]} stackId="a" barSize={36} />
-                  <Bar dataKey="late" name="Late" fill="#64748B" radius={[2, 2, 0, 0]} stackId="a" barSize={36} />
-                  <Bar dataKey="absent" name="Absent" fill="#CBD5E1" radius={[4, 4, 0, 0]} stackId="a" barSize={36} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 12 }} />
+                  <Bar dataKey="incidents" fill="#1E3A5F" radius={[4, 4, 0, 0]} barSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[250px] flex items-center justify-center text-[13px] text-gray-400 font-medium">No guard attendance logs recorded for this period.</div>
+            <div className="h-[250px] flex items-center justify-center text-[13px] text-gray-400">No incident data available for the last 30 days.</div>
           )}
         </div>
 
-        {/* Operational Guard Punctuality & Performance Summary */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-[14px] font-bold text-[#1E3A5F] uppercase tracking-wide">Punctuality & Arrival Compliance</h3>
-            <p className="text-[12px] text-[#6B7280] mt-0.5">Overall guard arrival promptness against shift start times</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 my-4">
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-4 rounded-lg text-center">
-              <p className="text-[11px] font-bold text-[#475569] uppercase tracking-wider">On-Time Shifts</p>
-              <p className="text-[28px] font-extrabold text-[#0F172A] mt-1 leading-none">{stats?.punctualitySummary?.onTime ?? 0}</p>
-            </div>
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-4 rounded-lg text-center">
-              <p className="text-[11px] font-bold text-[#475569] uppercase tracking-wider">Late Arrivals</p>
-              <p className="text-[28px] font-extrabold text-[#0F172A] mt-1 leading-none">{stats?.punctualitySummary?.late ?? 0}</p>
-            </div>
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-4 rounded-lg text-center">
-              <p className="text-[11px] font-bold text-[#475569] uppercase tracking-wider">Absences</p>
-              <p className="text-[28px] font-extrabold text-[#0F172A] mt-1 leading-none">{stats?.punctualitySummary?.absent ?? 0}</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-2">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col">
+          <h3 className="text-[14px] font-bold text-[#1E3A5F] mb-6">Incident Resolution Performance</h3>
+          <div className="flex-1 flex flex-col justify-center gap-6">
             <div>
-              <div className="flex justify-between text-[13px] font-medium text-[#0F172A] mb-1.5">
-                <span className="font-semibold text-[#334155]">On-Time Arrival Compliance Rate</span>
-                <span className="font-extrabold text-[15px] text-[#0F172A]">{stats?.punctualitySummary?.onTimeRate ?? 100}%</span>
+              <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1.5">
+                <span>Critical Incidents (Goal: &lt; 15m)</span>
+                <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.critical || 0}</span> mins avg</span>
               </div>
-              <div className="w-full bg-[#E2E8F0] rounded-full h-2">
-                <div className="bg-[#1E3A5F] h-2 rounded-full transition-all duration-300" style={{ width: `${stats?.punctualitySummary?.onTimeRate ?? 100}%` }}></div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.critical || 0) / 30) * 100, 100)}%` }}></div>
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-[13px] font-medium text-[#0F172A] mb-1.5">
-                <span className="font-semibold text-[#334155]">Overall Roster Attendance Rate</span>
-                <span className="font-extrabold text-[15px] text-[#0F172A]">{stats?.attendanceRate ?? 0}%</span>
+              <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1.5">
+                <span>Warnings & Violations (Goal: &lt; 60m)</span>
+                <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.warning || 0}</span> mins avg</span>
               </div>
-              <div className="w-full bg-[#E2E8F0] rounded-full h-2">
-                <div className="bg-[#475569] h-2 rounded-full transition-all duration-300" style={{ width: `${stats?.attendanceRate ?? 0}%` }}></div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.warning || 0) / 120) * 100, 100)}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-[13px] font-medium text-gray-600 mb-1.5">
+                <span>Routine Anomalies (Goal: &lt; 24h)</span>
+                <span><span className="font-bold text-[#0F172A]">{stats?.resolutionTimes?.routine || 0}</span> mins avg</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-[#1E3A5F] h-2 rounded-full" style={{ width: `${Math.min(((stats?.resolutionTimes?.routine || 0) / 1440) * 100, 100)}%` }}></div>
               </div>
             </div>
           </div>
@@ -2870,7 +1870,7 @@ function Reports({ role }: { role?: string }) {
               </tr>
             </thead>
             <tbody>
-              {filteredGuards.map(g => (
+              {guards.map(g => (
                 <tr key={g.id} className="hover:bg-gray-50 border-b border-gray-100 last:border-0">
                   <td className="px-6 py-4">
                     <p className="font-medium text-[13px] text-[#0F172A]">{formatGuardName(g)}</p>
@@ -2894,9 +1894,9 @@ function Reports({ role }: { role?: string }) {
                   </td>
                 </tr>
               ))}
-              {filteredGuards.length === 0 && (
+              {guards.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-400">No matching guard performance data.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-400">No guard data available in current scope.</td>
                 </tr>
               )}
             </tbody>
@@ -2907,240 +1907,92 @@ function Reports({ role }: { role?: string }) {
   );
 }
 
-function RoleSettings({ user }: { user?: any }) {
-  const role = user?.role || 'OPERATION_MANAGER';
-  const [profile, setProfile] = useState(() => ({
-    name: user?.name || (role === 'CLIENT' ? 'Client Org' : role === 'AGENCY' ? 'Agency Contact' : 'Ops Manager'),
-    email: user?.email || 'manager@spms.com',
-    phone: '+66 81 234 5678'
-  }));
+function SettingsOps() {
+  const [geofence, setGeofence] = useState(() => parseInt(localStorage.getItem('ops_geofence') || '50'));
+  const [mapStyle, setMapStyle] = useState(() => localStorage.getItem('ops_mapStyle') || 'street');
+  const [alerts, setAlerts] = useState(() => JSON.parse(localStorage.getItem('ops_alerts') || '{"missedPatrol":true,"sos":true,"geofence":false}'));
 
-  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
-  const [opsPrefs, setOpsPrefs] = useState(() => ({
-    defaultShiftCycle: localStorage.getItem('ops_shift_cycle') || '2-shift',
-    emailAlerts: JSON.parse(localStorage.getItem('ops_email_alerts') || 'true'),
-    contractExpiryReminders: JSON.parse(localStorage.getItem('ops_expiry_reminders') || 'true')
-  }));
+  const handleSave = () => {
+    localStorage.setItem('ops_geofence', geofence.toString());
+    localStorage.setItem('ops_mapStyle', mapStyle);
+    localStorage.setItem('ops_alerts', JSON.stringify(alerts));
 
-  const [adminPrefs, setAdminPrefs] = useState(() => ({
-    defaultUserRole: localStorage.getItem('admin_default_role') || 'GUARD',
-    pageSize: parseInt(localStorage.getItem('admin_page_size') || '10', 10),
-    dateFormat: localStorage.getItem('admin_date_format') || 'YYYY-MM-DD'
-  }));
-
-  const [agencyPrefs, setAgencyPrefs] = useState(() => ({
-    agencyName: localStorage.getItem('agency_name') || 'Apex Security Agency',
-    defaultShiftPref: localStorage.getItem('agency_default_shift') || 'Flexible',
-    autoVisibility: JSON.parse(localStorage.getItem('agency_auto_vis') || 'true')
-  }));
-
-  const [clientPrefs, setClientPrefs] = useState(() => ({
-    companyName: localStorage.getItem('client_company_name') || 'Siam Retail Group',
-    incidentAlerts: JSON.parse(localStorage.getItem('client_incident_alerts') || 'true'),
-    scheduleChangeAlerts: JSON.parse(localStorage.getItem('client_schedule_alerts') || 'true')
-  }));
-
-  const handleSaveOps = () => {
-    localStorage.setItem('ops_shift_cycle', opsPrefs.defaultShiftCycle);
-    localStorage.setItem('ops_email_alerts', JSON.stringify(opsPrefs.emailAlerts));
-    localStorage.setItem('ops_expiry_reminders', JSON.stringify(opsPrefs.contractExpiryReminders));
-    alert('Operations Settings saved.');
-  };
-
-  const handleSaveAdmin = () => {
-    localStorage.setItem('admin_default_role', adminPrefs.defaultUserRole);
-    localStorage.setItem('admin_page_size', adminPrefs.pageSize.toString());
-    localStorage.setItem('admin_date_format', adminPrefs.dateFormat);
-    alert('Admin System Preferences saved.');
-  };
-
-  const handleSaveAgency = () => {
-    localStorage.setItem('agency_name', agencyPrefs.agencyName);
-    localStorage.setItem('agency_default_shift', agencyPrefs.defaultShiftPref);
-    localStorage.setItem('agency_auto_vis', JSON.stringify(agencyPrefs.autoVisibility));
-    alert('Agency Profile & Preferences saved.');
-  };
-
-  const handleSaveClient = () => {
-    localStorage.setItem('client_company_name', clientPrefs.companyName);
-    localStorage.setItem('client_incident_alerts', JSON.stringify(clientPrefs.incidentAlerts));
-    localStorage.setItem('client_schedule_alerts', JSON.stringify(clientPrefs.scheduleChangeAlerts));
-    alert('Client Profile & Alert Settings saved.');
-  };
-
-  const handlePasswordChange = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordForm.next !== passwordForm.confirm) {
-      return alert('New passwords do not match.');
-    }
-    alert('Password updated successfully.');
-    setPasswordForm({ current: '', next: '', confirm: '' });
+    alert('Global Configurations saved successfully.');
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
-        <h2 className="text-[20px] font-bold text-[#1E3A5F] mb-1">
-          {role === 'ADMIN' ? 'System Administrator Settings' :
-           role === 'CLIENT' ? 'Client Organization Settings' :
-           role === 'AGENCY' ? 'Agency Manager Settings' : 'Operations Manager Settings'}
-        </h2>
-        <p className="text-[13px] text-gray-500">Manage profile data, notification policies, and account credentials.</p>
+    <div className="bg-white rounded border border-[#E2E8F0] shadow-sm max-w-4xl">
+      <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+        <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Operations Settings</h2>
+        <p className="text-[13px] text-gray-500">Configure global mechanics, map interfaces, and alert sensitivities.</p>
       </div>
 
-      {/* Common Section: Profile Data */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-4">
-        <h3 className="text-[15px] font-bold text-[#0F172A] border-b pb-2">User Profile & Contact Info</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">Full Name / Entity</label>
-            <input value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
+      <div className="p-6 space-y-8">
+        {/* Section 1: Map Mechanics */}
+        <section>
+          <h3 className="text-[14px] font-bold text-[#0F172A] mb-3 pb-2 border-b border-gray-100">Map & Tracking Mechanics</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Default Map Render Style</label>
+              <select value={mapStyle} onChange={(e) => setMapStyle(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 bg-white">
+                <option value="street">Standard Street Navigation</option>
+                <option value="satellite">High-Res Satellite View</option>
+                <option value="dark">Tactical Dark Mode (Night)</option>
+              </select>
+            </div>
+            <div>
+              <label className="flex justify-between items-center text-[13px] font-medium text-[#1E3A5F] mb-1.5">
+                <span>Checkpoint Scan Radius (m)</span>
+                <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{geofence}m</span>
+              </label>
+              <input
+                type="range"
+                min="10" max="200" step="10"
+                value={geofence}
+                onChange={(e) => setGeofence(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600 mt-2"
+              />
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">Allowable GPS drift displacement when a guard physically scans an NFC checkpoint tag on site.</p>
+            </div>
           </div>
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">Email Address</label>
-            <input value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
+        </section>
+
+        {/* Section 2: Alert Escalation */}
+        <section>
+          <h3 className="text-[14px] font-bold text-[#0F172A] mb-4 pb-2 border-b border-gray-100">Critical Alert Dispatching</h3>
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input type="checkbox" checked={alerts.sos} onChange={e => setAlerts({ ...alerts, sos: e.target.checked })} className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+              <div>
+                <p className="text-[13px] font-semibold text-[#1E3A5F] leading-none mb-1 group-hover:text-blue-600 transition-colors">SOS Panic Button Triggers</p>
+                <p className="text-[12px] text-gray-500">Push notification SMS when guard hits panic module on mobile app.</p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input type="checkbox" checked={alerts.missedPatrol} onChange={e => setAlerts({ ...alerts, missedPatrol: e.target.checked })} className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+              <div>
+                <p className="text-[13px] font-semibold text-[#1E3A5F] leading-none mb-1 group-hover:text-blue-600 transition-colors">Missed Patrol Checkpoints</p>
+                <p className="text-[12px] text-gray-500">Alert if guard is &gt;15 mins late to NFC scan point schedule.</p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input type="checkbox" checked={alerts.geofence} onChange={e => setAlerts({ ...alerts, geofence: e.target.checked })} className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+              <div>
+                <p className="text-[13px] font-semibold text-[#1E3A5F] leading-none mb-1 group-hover:text-blue-600 transition-colors">Spoofed Checkpoint Scans</p>
+                <p className="text-[12px] text-gray-500">Flag when a guard scans a checkpoint tag from outside the allowable physical radius.</p>
+              </div>
+            </label>
           </div>
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">Contact Telephone</label>
-            <input value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-          </div>
-        </div>
+        </section>
       </div>
 
-      {/* Role-Specific Panels */}
-      {(role === 'OPERATION_MANAGER' || !role) && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-4">
-          <h3 className="text-[15px] font-bold text-[#0F172A] border-b pb-2">Operations Scheduling & Dispatch Preferences</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[12px] font-medium text-gray-700 mb-1">Default Contract Shift Cycle</label>
-              <select value={opsPrefs.defaultShiftCycle} onChange={e => setOpsPrefs({ ...opsPrefs, defaultShiftCycle: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]">
-                <option value="2-shift">2-Shift (12 Hours each)</option>
-                <option value="3-shift">3-Shift (8 Hours each)</option>
-              </select>
-            </div>
-          </div>
-          <div className="space-y-3 pt-2">
-            <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={opsPrefs.emailAlerts} onChange={e => setOpsPrefs({ ...opsPrefs, emailAlerts: e.target.checked })} className="rounded text-blue-600" />
-              <span>Send immediate email alerts for Unresolved Critical Incidents</span>
-            </label>
-            <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={opsPrefs.contractExpiryReminders} onChange={e => setOpsPrefs({ ...opsPrefs, contractExpiryReminders: e.target.checked })} className="rounded text-blue-600" />
-              <span>Remind Operations 30 days prior to contract expiration</span>
-            </label>
-          </div>
-          <div className="flex justify-end pt-2">
-            <button onClick={handleSaveOps} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-semibold hover:bg-blue-900 transition-colors">Save Ops Preferences</button>
-          </div>
-        </div>
-      )}
-
-      {role === 'ADMIN' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-4">
-          <h3 className="text-[15px] font-bold text-[#0F172A] border-b pb-2">System Defaults & Backup</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[12px] font-medium text-gray-700 mb-1">Default Onboarding Role</label>
-              <select value={adminPrefs.defaultUserRole} onChange={e => setAdminPrefs({ ...adminPrefs, defaultUserRole: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]">
-                <option value="GUARD">Guard</option>
-                <option value="CLIENT">Client</option>
-                <option value="AGENCY">Agency</option>
-                <option value="OPERATION_MANAGER">Operations Manager</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[12px] font-medium text-gray-700 mb-1">Table Items Per Page</label>
-              <input type="number" value={adminPrefs.pageSize} onChange={e => setAdminPrefs({ ...adminPrefs, pageSize: parseInt(e.target.value) || 10 })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-            </div>
-            <div>
-              <label className="block text-[12px] font-medium text-gray-700 mb-1">Display Date Format</label>
-              <select value={adminPrefs.dateFormat} onChange={e => setAdminPrefs({ ...adminPrefs, dateFormat: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]">
-                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-between items-center pt-3 border-t">
-            <button onClick={() => alert('Exporting full database JSON backup...')} className="px-3 py-1.5 border border-gray-300 text-gray-700 text-[12px] font-semibold rounded hover:bg-gray-100">Export System Database Backup</button>
-            <button onClick={handleSaveAdmin} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-semibold hover:bg-blue-900 transition-colors">Save Admin Preferences</button>
-          </div>
-        </div>
-      )}
-
-      {role === 'AGENCY' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-4">
-          <h3 className="text-[15px] font-bold text-[#0F172A] border-b pb-2">Agency Profile & Guard Onboarding Defaults</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[12px] font-medium text-gray-700 mb-1">Registered Agency Name</label>
-              <input value={agencyPrefs.agencyName} onChange={e => setAgencyPrefs({ ...agencyPrefs, agencyName: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-            </div>
-            <div>
-              <label className="block text-[12px] font-medium text-gray-700 mb-1">Default Guard Shift Preference</label>
-              <select value={agencyPrefs.defaultShiftPref} onChange={e => setAgencyPrefs({ ...agencyPrefs, defaultShiftPref: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]">
-                <option value="Flexible">Flexible</option>
-                <option value="Day">Day</option>
-                <option value="Night">Night</option>
-              </select>
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer pt-2">
-            <input type="checkbox" checked={agencyPrefs.autoVisibility} onChange={e => setAgencyPrefs({ ...agencyPrefs, autoVisibility: e.target.checked })} className="rounded text-blue-600" />
-            <span>Automatically mark newly onboarded guards as Visible to Operations Managers</span>
-          </label>
-          <div className="flex justify-end pt-2">
-            <button onClick={handleSaveAgency} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-semibold hover:bg-blue-900 transition-colors">Save Agency Settings</button>
-          </div>
-        </div>
-      )}
-
-      {role === 'CLIENT' && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-4">
-          <h3 className="text-[15px] font-bold text-[#0F172A] border-b pb-2">Client Company Profile & Alert Subscriptions</h3>
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">Company Entity Name</label>
-            <input value={clientPrefs.companyName} onChange={e => setClientPrefs({ ...clientPrefs, companyName: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-          </div>
-          <div className="space-y-3 pt-2">
-            <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={clientPrefs.incidentAlerts} onChange={e => setClientPrefs({ ...clientPrefs, incidentAlerts: e.target.checked })} className="rounded text-blue-600" />
-              <span>Receive real-time notifications for verified site security incidents</span>
-            </label>
-            <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={clientPrefs.scheduleChangeAlerts} onChange={e => setClientPrefs({ ...clientPrefs, scheduleChangeAlerts: e.target.checked })} className="rounded text-blue-600" />
-              <span>Receive weekly summary of guard shift allocations</span>
-            </label>
-          </div>
-          <div className="flex justify-end pt-2">
-            <button onClick={handleSaveClient} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-semibold hover:bg-blue-900 transition-colors">Save Client Settings</button>
-          </div>
-        </div>
-      )}
-
-      {/* Common Section: Password Change */}
-      <form onSubmit={handlePasswordChange} className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-4">
-        <h3 className="text-[15px] font-bold text-[#0F172A] border-b pb-2">Security & Password Credentials</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">Current Password</label>
-            <input type="password" required value={passwordForm.current} onChange={e => setPasswordForm({ ...passwordForm, current: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-          </div>
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">New Password</label>
-            <input type="password" required value={passwordForm.next} onChange={e => setPasswordForm({ ...passwordForm, next: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-          </div>
-          <div>
-            <label className="block text-[12px] font-medium text-gray-700 mb-1">Confirm New Password</label>
-            <input type="password" required value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} className="w-full border rounded px-3 py-1.5 text-[13px]" />
-          </div>
-        </div>
-        <div className="flex justify-end pt-2">
-          <button type="submit" className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-semibold hover:bg-black transition-colors">Update Password</button>
-        </div>
-      </form>
+      <div className="px-6 py-4 border-t border-[#E2E8F0] bg-gray-50 flex justify-end">
+        <button onClick={handleSave} className="bg-[#1E3A5F] text-white px-5 py-2.5 rounded text-[13px] font-semibold hover:bg-black transition-colors shadow-sm">
+          Save Global Configurations
+        </button>
+      </div>
     </div>
-  );
+  )
 }
 
 export function ClientReports() {
@@ -3151,10 +2003,6 @@ export function AgencyGuards() {
   const [guards, setGuards] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [shiftFilter, setShiftFilter] = useState('All');
 
   const defaultFormData = {
     firstName: '',
@@ -3221,49 +2069,17 @@ export function AgencyGuards() {
     } catch (err) { alert("Error saving guard."); }
   };
 
-  const filteredGuards = useMemo(() => {
-    return guards.filter(g => {
-      const gName = (g.firstName + ' ' + g.lastName).toLowerCase();
-      const agencyName = (g.agency?.name || 'In-House').toLowerCase();
-      const matchesSearch = gName.includes(searchQuery.toLowerCase()) || g.guardId.toLowerCase().includes(searchQuery.toLowerCase()) || agencyName.includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'All' || g.status === statusFilter;
-      const matchesShift = shiftFilter === 'All' || g.shiftPreference === shiftFilter;
-      return matchesSearch && matchesStatus && matchesShift;
-    });
-  }, [guards, searchQuery, statusFilter, shiftFilter]);
-
   return (
     <>
       <div className="bg-white rounded border border-[#E2E8F0] shadow-sm">
-        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC] gap-6">
-          <div className="flex-shrink-0">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center bg-[#F8FAFC]">
+          <div>
             <h2 className="text-[18px] font-semibold text-[#1E3A5F]">Agency Roster</h2>
             <p className="text-[13px] text-gray-500">Manage guards under your agency and toggle their availability for Ops.</p>
           </div>
-          <div className="flex flex-1 items-center gap-2 justify-end">
-            <input
-              type="text"
-              placeholder="Search ID, Name, Agency..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none focus:border-[#1E3A5F] flex-1 max-w-[800px]"
-            />
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none">
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="On Leave">On Leave</option>
-              <option value="Suspended">Suspended</option>
-            </select>
-            <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)} className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none">
-              <option value="All">All Shifts</option>
-              <option value="Flexible">Flexible</option>
-              <option value="Day">Day</option>
-              <option value="Night">Night</option>
-            </select>
-            <button onClick={openCreate} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors ml-2">
-              + Add Guard
-            </button>
-          </div>
+          <button onClick={openCreate} className="bg-[#1E3A5F] text-white px-4 py-2 rounded text-[13px] font-medium hover:bg-[#162D4A] transition-colors">
+            + Add Guard
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -3277,10 +2093,10 @@ export function AgencyGuards() {
               </tr>
             </thead>
             <tbody>
-              {filteredGuards.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-[13px]">No guards match your search filters.</td></tr>
+              {guards.length === 0 ? (
+                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-[13px]">No guards assigned to your agency yet.</td></tr>
               ) : (
-                filteredGuards.map(g => (
+                guards.map(g => (
                   <tr key={g.id} className="hover:bg-[#F8FAFC]">
                     <td className="px-6 py-4 text-[14px] font-medium text-[#1E3A5F]">{g.guardId}</td>
                     <td className="px-6 py-4 text-[14px] text-[#0F172A]">{g.firstName} {g.lastName}</td>
@@ -3311,7 +2127,7 @@ export function AgencyGuards() {
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-[500px] overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b bg-[#F8FAFC] flex justify-between">
               <h3 className="text-lg font-semibold text-[#1E3A5F]">Agency Guard Form</h3>
-              <button type="button" onClick={() => setIsCreating(false)} className="text-gray-500 hover:text-black">✖</button>
+              <button type="button" onClick={() => setIsCreating(false)} className="text-gray-500 hover:text-black">โ–</button>
             </div>
             <div className="p-6 overflow-y-auto space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -3576,9 +2392,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
-        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/" element={<Navigate to={
           user?.role === 'ADMIN' ? "/admin" :
             user?.role === 'AGENCY_MANAGER' ? "/agency" :
@@ -3592,14 +2406,13 @@ export default function App() {
           <Route index element={<GuardDashboard />} />
           <Route path="shifts" element={<GuardMyShifts />} />
           <Route path="incidents" element={<GuardReportIncident />} />
-          <Route path="settings" element={<RoleSettings user={user} />} />
         </Route>
 
         {/* Admin Sphere */}
         <Route path="/admin" element={<ProtectedRoute allowed={['ADMIN']} role={user?.role}><AdminLayout user={user} onLogout={handleLogout} /></ProtectedRoute>}>
           <Route index element={<AdminUserManagement />} />
           <Route path="guards" element={<AdminGuardProvisioning />} />
-          <Route path="settings" element={<RoleSettings user={user} />} />
+          <Route path="settings" element={<div className="p-6">System Settings Under Construction</div>} />
         </Route>
 
         {/* Agency Sphere */}
@@ -3608,7 +2421,6 @@ export default function App() {
           <Route path="schedules" element={<Schedules role={user?.role} />} />
           <Route path="logs" element={<Logs role={user?.role} />} />
           <Route path="reports" element={<Reports role={user?.role} />} />
-          <Route path="settings" element={<RoleSettings user={user} />} />
         </Route>
 
         {/* Ops Sphere */}
@@ -3620,7 +2432,7 @@ export default function App() {
           <Route path="logs" element={<Logs role={user?.role} />} />
           <Route path="reports" element={<Reports role={user?.role} />} />
           <Route path="requests" element={<ServiceRequests />} />
-          <Route path="settings" element={<RoleSettings user={user} />} />
+          <Route path="settings" element={<SettingsOps />} />
           <Route path="*" element={<div>Page under construction</div>} />
         </Route>
 
@@ -3634,7 +2446,7 @@ export default function App() {
           <Route path="guards" element={<ClientGuards />} />
           <Route path="schedules" element={<Schedules role={user?.role} />} />
           <Route path="reports" element={<Reports role={user?.role} />} />
-          <Route path="settings" element={<RoleSettings user={user} />} />
+          <Route path="settings" element={<div className="p-6">Client Settings under construction</div>} />
           <Route path="*" element={<div>Client Module under construction</div>} />
         </Route>
       </Routes>
