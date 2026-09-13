@@ -181,8 +181,8 @@ router.post('/generate', async (req: Request, res: Response): Promise<void> => {
 router.post('/auto-schedule-preview', async (req: Request, res: Response): Promise<void> => {
   try {
     const { siteId, startDate, endDate } = req.body;
-    const start = startDate ? new Date(startDate) : new Date();
-    const end = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 86400000);
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 86400000);
+    const end = endDate ? new Date(endDate) : new Date(Date.now() + 180 * 86400000);
     end.setHours(23, 59, 59, 999);
 
     const safeIsoDate = (d: any): string | null => {
@@ -206,14 +206,33 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
     };
     if (siteId) where.siteId = String(siteId);
 
-    const unassignedRosters = await (prisma as any).siteRoster.findMany({
+    let unassignedRosters = await (prisma as any).siteRoster.findMany({
       where,
       include: { site: true },
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }]
     });
 
+    // Fallback: If no unassigned rosters found in narrow date range, query all unassigned rosters without date constraint
     if (unassignedRosters.length === 0) {
-      res.json({ success: true, recommendations: [], count: 0, message: 'No unassigned shift slots found for the selected period.' });
+      const fallbackWhere: any = {
+        OR: [
+          { guardId: null },
+          { guardId: '' },
+          { status: 'Unassigned' }
+        ]
+      };
+      if (siteId) fallbackWhere.siteId = String(siteId);
+
+      unassignedRosters = await (prisma as any).siteRoster.findMany({
+        where: fallbackWhere,
+        include: { site: true },
+        orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+        take: 100
+      });
+    }
+
+    if (unassignedRosters.length === 0) {
+      res.json({ success: true, recommendations: [], count: 0, message: 'No unassigned shift slots found.' });
       return;
     }
 

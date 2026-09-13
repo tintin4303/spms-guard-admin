@@ -1867,10 +1867,13 @@ function Schedules({ role }: { role?: string }) {
             <>
               <button 
                 onClick={() => {
+                  const today = new Date();
+                  const startStr = today.toISOString().split('T')[0];
+                  const endStr = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0];
                   const defaultFilter = {
                     siteId: siteFilter !== 'All Sites' ? siteFilter : '',
-                    startDate: new Date().toISOString().split('T')[0],
-                    endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+                    startDate: startStr,
+                    endDate: endStr
                   };
                   setAutoScheduleFilter(defaultFilter);
                   setIsAutoScheduling(true);
