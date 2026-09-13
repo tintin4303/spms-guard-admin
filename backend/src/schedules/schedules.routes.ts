@@ -205,15 +205,38 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
       return;
     }
 
-    const allGuards = await (prisma as any).guard.findMany({
-      where: { status: 'ACTIVE' },
+    let allGuards = await (prisma as any).guard.findMany({
+      where: {
+        OR: [
+          { status: { in: ['Active', 'ACTIVE', 'active', 'On Duty', 'ON_DUTY'] } },
+          { status: null }
+        ]
+      },
       include: { agency: true }
     });
+
+    if (allGuards.length === 0) {
+      allGuards = await (prisma as any).guard.findMany({
+        where: {
+          NOT: {
+            status: { in: ['On Leave', 'ON_LEAVE', 'Inactive', 'INACTIVE'] }
+          }
+        },
+        include: { agency: true }
+      });
+    }
+
+    if (allGuards.length === 0) {
+      allGuards = await (prisma as any).guard.findMany({
+        include: { agency: true }
+      });
+    }
 
     const existingAssignedRosters = await (prisma as any).siteRoster.findMany({
       where: {
         date: { gte: start, lte: end },
-        guardId: { not: null }
+        guardId: { not: null },
+        status: { notIn: ['Unassigned', 'Cancelled'] }
       }
     });
 
