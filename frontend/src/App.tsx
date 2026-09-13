@@ -2431,18 +2431,20 @@ function Schedules({ role }: { role?: string }) {
                           {rec.allScoredGuards && rec.allScoredGuards.length > 0 ? (
                             rec.allScoredGuards.map((sg: any, index: number) => {
                               const isRecommended = topGuard && sg.guardId === topGuard.guardId;
+                              const pref = sg.shiftPreference || 'Flexible';
                               return (
                                 <option key={sg.guardId} value={sg.guardId}>
-                                  #{index + 1} • {sg.guardName} ({sg.guardCode}) [{sg.matchScore}% Match]{isRecommended ? ' (Recommended)' : ''}
+                                  #{index + 1} • {sg.guardName} ({pref}) [{sg.matchScore}% Match]{isRecommended ? ' (Recommended)' : ''}
                                 </option>
                               );
                             })
                           ) : (
                             guards.map((g: any) => {
                               const isRecommended = topGuard && g.id === topGuard.guardId;
+                              const pref = g.shiftPreference || 'Flexible';
                               return (
                                 <option key={g.id} value={g.id}>
-                                  {g.firstName} {g.lastName} ({g.guardId}){isRecommended ? ' (Recommended)' : ''}
+                                  {g.firstName} {g.lastName} ({pref}){isRecommended ? ' (Recommended)' : ''}
                                 </option>
                               );
                             })
