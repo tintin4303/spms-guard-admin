@@ -1879,13 +1879,13 @@ function Schedules({ role }: { role?: string }) {
                   setIsAutoScheduling(true);
                   handleCalculateAutoSchedule(defaultFilter);
                 }}
-                className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors flex items-center gap-1.5"
+                className="bg-[#1E3A5F] text-white px-4 py-1.5 rounded-lg text-[13px] font-bold hover:bg-[#162D4A] shadow-sm transition-all border border-[#1E3A5F]"
               >
                 Auto-Schedule Suggestions
               </button>
               <button 
                 onClick={() => setIsGeneratingSlots(true)} 
-                className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors"
+                className="bg-white text-[#1E3A5F] border border-slate-300 px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-slate-50 hover:border-slate-400 shadow-2xs transition-all"
               >
                 + Generate Shift Slots
               </button>
@@ -1901,12 +1901,9 @@ function Schedules({ role }: { role?: string }) {
                   });
                   setIsBatchAssigning(true);
                 }}
-                className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors"
+                className="bg-white text-[#1E3A5F] border border-slate-300 px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-slate-50 hover:border-slate-400 shadow-2xs transition-all"
               >
                 + Batch Assign (Date Range)
-              </button>
-              <button onClick={openCreateRoster} className="bg-[#1E3A5F] text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-[#162D4A] shadow-sm transition-colors">
-                + Assign Post
               </button>
             </>
           )}
