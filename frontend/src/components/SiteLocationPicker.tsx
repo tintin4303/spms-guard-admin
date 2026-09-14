@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface LocationPickerProps {
   initialLat?: number | null;

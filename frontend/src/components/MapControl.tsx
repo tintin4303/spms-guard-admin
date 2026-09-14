@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import Map, { Source, Layer, Marker, NavigationControl } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { savePatrolPath, fetchPatrolPaths, updatePatrolPath, deletePatrolPath, fetchContracts } from '../api';
 
 interface Pin {
