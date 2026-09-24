@@ -38,56 +38,45 @@ function Login({ onLogin }: { onLogin: (u: any) => void }) {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#F8FAFC] p-4 sm:p-6">
-      <div className="flex flex-col md:flex-row w-full max-w-[850px] bg-white rounded-xl shadow-lg border border-[#E2E8F0] overflow-hidden">
-
-        {/* Login Form Section */}
-        <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-10 border-b md:border-b-0 md:border-r border-[#E2E8F0] flex flex-col justify-center">
-          <div className="mb-6 md:mb-8 text-center md:text-left">
-            <h2 className="text-[22px] sm:text-[26px] font-bold text-[#1E3A5F]">SPMS Portal</h2>
-            <p className="text-[13px] sm:text-[14px] text-gray-500 mt-1">Sign in to your operations account</p>
+      <div className="w-full max-w-[420px] bg-white rounded-xl shadow-lg border border-[#E2E8F0] p-6 sm:p-8 md:p-10 flex flex-col justify-center">
+        <div className="mb-6 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1E3A5F]/10 text-[#1E3A5F] mb-3">
+            <ShieldAlert className="w-6 h-6" />
           </div>
-          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
-            <div>
-              <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Email address</label>
-              <input required value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="example@spms.com" className="w-full border border-gray-300 rounded px-3 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F]" />
-            </div>
-            <div>
-              <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Password</label>
-              <input required value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="••••••••" className="w-full border border-gray-300 rounded px-3 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F]" />
-            </div>
-            <button disabled={loading} type="submit" className="w-full bg-[#1E3A5F] text-white py-2.5 rounded text-[14px] font-medium hover:bg-[#162D4A] mt-2 transition-colors">
-              {loading ? 'Authenticating...' : 'Sign In'}
-            </button>
-          </form>
+          <h2 className="text-[22px] sm:text-[24px] font-bold text-[#1E3A5F]">SPMS Portal</h2>
+          <p className="text-[13px] text-gray-500 mt-1">Sign in to your security operations account</p>
         </div>
-
-        {/* Active Demo Credentials Section */}
-        <div className="w-full md:w-1/2 bg-[#F1F5F9] p-6 sm:p-8 md:p-10 flex flex-col justify-center">
-          <h3 className="text-[13px] sm:text-[14px] font-bold text-[#1E3A5F] mb-4 md:mb-5 uppercase tracking-wider">Active Demo Credentials</h3>
-          <ul className="space-y-3 sm:space-y-4 text-[13px] text-gray-700">
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
-              <span className="font-semibold text-[#1E3A5F]">Operation Manager</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">ops@spms.com</span>
-            </li>
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
-              <span className="font-semibold text-[#1E3A5F]">Security Guard</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">guard1@spms.com</span>
-            </li>
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
-              <span className="font-semibold text-[#1E3A5F]">System Admin</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">admin@spms.com</span>
-            </li>
-            <li className="flex flex-col border-b border-gray-200 pb-2.5">
-              <span className="font-semibold text-[#1E3A5F]">Client</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">client@spms.com</span>
-            </li>
-            <li className="flex flex-col pb-1">
-              <span className="font-semibold text-[#1E3A5F]">Agency Manager</span>
-              <span className="mt-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit select-all font-mono text-[12px]">agency@spms.com</span>
-            </li>
-          </ul>
-          <p className="text-[11px] text-gray-500 mt-4 md:mt-6">(The password for all accounts is 1234 or password123)</p>
-        </div>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Email address</label>
+            <input 
+              required 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              type="email" 
+              placeholder="name@company.com" 
+              className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F] focus:ring-1 focus:ring-[#1E3A5F]" 
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] font-medium text-[#1E3A5F] mb-1.5">Password</label>
+            <input 
+              required 
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              type="password" 
+              placeholder="••••••••" 
+              className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-[#1E3A5F] focus:ring-1 focus:ring-[#1E3A5F]" 
+            />
+          </div>
+          <button 
+            disabled={loading} 
+            type="submit" 
+            className="w-full bg-[#1E3A5F] text-white py-2.5 rounded-lg text-[14px] font-semibold hover:bg-[#162D4A] mt-2 transition-colors shadow-sm disabled:opacity-50"
+          >
+            {loading ? 'Authenticating...' : 'Sign In'}
+          </button>
+        </form>
       </div>
     </div>
   )
