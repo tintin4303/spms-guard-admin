@@ -1315,7 +1315,7 @@ function Schedules({ role }: { role?: string }) {
   const [formData, setFormData] = useState(defaultFormData);
   const [errorMsg, setErrorMsg] = useState('');
   
-  const [isGenerating, setIsGenerating] = useState(false);
+
   const [isAssigning, setIsAssigning] = useState<any>(null);
 
   // Guard Absence & 1-Click Replacement State
@@ -1421,10 +1421,7 @@ function Schedules({ role }: { role?: string }) {
     return s.name;
   };
 
-  const openCreateRoster = () => {
-    setFormData(defaultFormData);
-    setIsCreatingRoster(true);
-  };
+
 
   const openCreateException = (sched: any) => {
     setFormData({
@@ -1448,16 +1445,8 @@ function Schedules({ role }: { role?: string }) {
     }
   };
 
-  const getNext7Days = () => {
-    const days = [];
-    let d = new Date();
-    for (let i = 0; i < 7; i++) {
-      days.push(new Date(d));
-      d.setDate(d.getDate() + 1);
-    }
-    return days;
-  };
-  const weekDays = getNext7Days();
+
+
 
   const [isSubmittingRoster, setIsSubmittingRoster] = useState(false);
   const handleRosterSubmit = async (e: any) => {
@@ -2988,7 +2977,7 @@ function Schedules({ role }: { role?: string }) {
                   onChange={e => {
                     const newSiteId = e.target.value;
                     const site = uniqueSites.find((s: any) => s.id === newSiteId);
-                    const defaultShift = site?.shiftTimings?.[0] ? `${site.shiftTimings[0].start} - ${site.shiftTimings[0].end}` : '';
+
                     const defaultStart = site?.shiftTimings?.[0]?.start || '08:00';
                     const defaultEnd = site?.shiftTimings?.[0]?.end || '20:00';
                     setBatchFormData({
@@ -3619,7 +3608,8 @@ function Reports({ role }: { role?: string }) {
   const filteredGuards = useMemo(() => {
     return guards.filter(g => {
       const gName = (g.firstName + ' ' + g.lastName).toLowerCase();
-      const matchesSearch = gName.includes(searchQuery.toLowerCase()) || g.guardId.toLowerCase().includes(searchQuery.toLowerCase());
+      const agencyName = (g.agency?.name || 'In-House').toLowerCase();
+      const matchesSearch = gName.includes(searchQuery.toLowerCase()) || g.guardId.toLowerCase().includes(searchQuery.toLowerCase()) || agencyName.includes(searchQuery.toLowerCase());
       const matchesAgency = agencyFilter === 'All' || g.agency?.name === agencyFilter;
       return matchesSearch && matchesAgency;
     });
