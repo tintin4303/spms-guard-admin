@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
 router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -26,20 +25,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
        siteWhere = { ...siteWhere, contract: { clientId: user.userId } };
     }
 
-    let dateWhere: any = {};
-    if (startDate || endDate) {
-      dateWhere = {};
-      if (startDate) dateWhere.gte = new Date(String(startDate));
-      if (endDate) dateWhere.lte = new Date(String(endDate));
-    }
+    // Default to Current Month if no date filters passed to prevent system lag across all roles
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const startObj = startDate ? new Date(String(startDate)) : currentMonthStart;
+    const endObj = endDate ? new Date(String(endDate)) : currentMonthEnd;
 
     const whereClause: any = {
       site: { ...siteWhere },
+      date: { gte: startObj, lte: endObj }
     };
-    
-    if (Object.keys(dateWhere).length > 0) {
-      whereClause.date = dateWhere;
-    }
 
     if (String(isUnassigned) === 'true') {
       whereClause.guardId = null;
@@ -72,9 +69,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       date: r.date ? r.date.toISOString() : null,
       startTime: r.startTime,
       endTime: r.endTime,
-      shiftLabel: `${r.date ? r.date.toISOString().split('T')[0] : 'N/A'}, ${r.startTime} - ${r.endTime}`,
+      shiftLabel: r.shiftLabel || `${r.date ? r.date.toISOString().split('T')[0] : 'N/A'}, ${r.startTime} - ${r.endTime}`,
       guardId: r.guardId,
       guard: r.guard || null,
+      siteId: r.siteId || r.site?.id,
       site: r.site,
       patrolPathId: r.patrolPathId,
       patrolPath: r.patrolPath,
@@ -134,13 +132,22 @@ router.post('/generate', async (req: Request, res: Response): Promise<void> => {
       }
 
       let shiftTemplates: any[] = [];
-      if (site.shiftTimings && Array.isArray(site.shiftTimings) && site.shiftTimings.length > 0) {
+      const requiredShiftCount = site.shiftCount || 2;
+      if (site.shiftTimings && Array.isArray(site.shiftTimings) && site.shiftTimings.length >= requiredShiftCount) {
         shiftTemplates = site.shiftTimings;
       } else {
-        if (site.shiftCount === 2) {
-          shiftTemplates = [{ start: "08:00", end: "20:00", label: "Day Shift" }, { start: "20:00", end: "08:00", label: "Night Shift" }];
+        if (requiredShiftCount === 3) {
+          shiftTemplates = [
+            { start: "00:00", end: "08:00", label: "Morning Shift (00:00 - 08:00)" },
+            { start: "08:00", end: "16:00", label: "Afternoon Shift (08:00 - 16:00)" },
+            { start: "16:00", end: "00:00", label: "Night Shift (16:00 - 00:00)" }
+          ];
         } else {
-          shiftTemplates = [{ start: "00:00", end: "08:00", label: "Morning" }, { start: "08:00", end: "16:00", label: "Afternoon" }, { start: "16:00", end: "00:00", label: "Night" }];
+          // Default 2 Shifts: Day Shift & Night Shift
+          shiftTemplates = [
+            { start: "08:00", end: "20:00", label: "Day Shift (08:00 - 20:00)" },
+            { start: "20:00", end: "08:00", label: "Night Shift (20:00 - 08:00)" }
+          ];
         }
       }
 
@@ -149,22 +156,41 @@ router.post('/generate', async (req: Request, res: Response): Promise<void> => {
         const dateLimit = new Date(currentDate);
         
         for (const t of shiftTemplates) {
-          const exists = await prisma.siteRoster.findFirst({
-            where: { siteId: site.id, date: dateLimit, startTime: t.start }
+          const tStart = typeof t === 'string' ? t.split(' - ')[0] : (t.start || t.startTime || '08:00');
+          const tEnd = typeof t === 'string' ? t.split(' - ')[1] : (t.end || t.endTime || '20:00');
+          const tLabel = typeof t === 'string' ? t : (t.label || t.name || 'Shift');
+
+          const neededGuards = Math.max(1, site.guardsPerShift || 1);
+          const existingCount = await (prisma as any).siteRoster.count({
+            where: { siteId: site.id, date: dateLimit, startTime: tStart }
           });
 
-          if (!exists) {
-            await prisma.siteRoster.create({
-              data: {
+          for (let gIdx = 0; gIdx < neededGuards; gIdx++) {
+            const postLabel = neededGuards > 1 ? `${tLabel} (Post ${gIdx + 1})` : tLabel;
+            
+            // Absolute Idempotency Check: Prevent duplicate slot insertion if slot already exists
+            const exists = await (prisma as any).siteRoster.findFirst({
+              where: {
                 siteId: site.id,
                 date: dateLimit,
-                shiftLabel: t.label || 'Shift',
-                startTime: t.start,
-                endTime: t.end,
-                status: 'Scheduled'
+                startTime: tStart,
+                shiftLabel: postLabel
               }
             });
-            totalInserted++;
+
+            if (!exists) {
+              await (prisma as any).siteRoster.create({
+                data: {
+                  siteId: site.id,
+                  date: dateLimit,
+                  shiftLabel: postLabel,
+                  startTime: tStart,
+                  endTime: tEnd,
+                  status: 'Scheduled'
+                }
+              });
+              totalInserted++;
+            }
           }
         }
         currentDate.setDate(currentDate.getDate() + 1);
@@ -289,29 +315,61 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
 
         let score = 0;
         const rationale: string[] = [];
+        let isEligible = true;
+        let disqualificationReason = '';
 
-        // 1. Availability / Daily assignment check
+        // 1. Availability / Legal 1 Shift/Day Limit Check (HARD RESTRICTION)
         if (alreadyWorking) {
-          score -= 50; // Penalty for double assignment on same day
-          rationale.push('Same-Day Double Shift Warning');
-        } else {
-          score += 30; // Unassigned on this date
+          isEligible = false;
+          disqualificationReason = 'Legally Restricted: Max 1 Shift/Day';
+          rationale.push('Disqualified: Max 1 Shift/Day Reached');
         }
 
-        // 2. Shift Preference Match (+40 pts)
+        // 2. Strict Shift Preference Match (HARD RESTRICTION FOR PREFERENCE CONFLICTS)
         const pref = (g.shiftPreference || 'Flexible').toLowerCase();
-        if ((pref.includes('day') && !isNightShift) || (pref.includes('night') && isNightShift)) {
+        let isPrefMismatch = false;
+
+        if (pref.includes('day') && isNightShift) {
+          isEligible = false;
+          disqualificationReason = 'Ineligible: Day Preference Guard on Night Shift';
+          rationale.push('Disqualified: Day-Only Guard');
+          isPrefMismatch = true;
+        } else if (pref.includes('night') && !isNightShift) {
+          isEligible = false;
+          disqualificationReason = 'Ineligible: Night Preference Guard on Day Shift';
+          rationale.push('Disqualified: Night-Only Guard');
+          isPrefMismatch = true;
+        } else if ((pref.includes('day') && !isNightShift) || (pref.includes('night') && isNightShift)) {
           score += 40;
           rationale.push(`Shift Preference Match (${isNightShift ? 'Night' : 'Day'})`);
-        } else if (pref.includes('flexible') || !g.shiftPreference) {
+        } else {
           score += 30;
           rationale.push('Flexible Availability');
-        } else {
-          score += 10;
-          rationale.push('Available (Non-Preferred Shift)');
         }
 
-        // 3. Workload Balancing (+30 pts max)
+        // 3. Rest Interval Protection (HARD RESTRICTION FOR CONSECUTIVE NIGHT/DAY SHIFTS)
+        if (r.date) {
+          const prevDay = new Date(r.date);
+          prevDay.setDate(prevDay.getDate() - 1);
+          const prevDateIso = safeIsoDate(prevDay);
+          if (prevDateIso && guardDailyAssignments[`${gId}_${prevDateIso}`]) {
+            if (!isNightShift && startHour < 12) {
+              isEligible = false;
+              disqualificationReason = 'Ineligible: Mandatory 12-Hour Rest Buffer Violation';
+              rationale.push('Disqualified: Insufficient Rest Interval');
+            } else {
+              score += 10;
+              rationale.push('Rest Interval Caution');
+            }
+          } else {
+            score += 20;
+            rationale.push('Rest Period Protected');
+          }
+        } else {
+          score += 15;
+        }
+
+        // 4. Workload Balancing (+30 pts max)
         const currentCount = guardSimulatedShifts[gId] || 0;
         if (currentCount === 0) {
           score += 30;
@@ -326,21 +384,6 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           score += 10;
         }
 
-        // 4. Rest Interval Protection (+20 pts)
-        if (r.date) {
-          const prevDay = new Date(r.date);
-          prevDay.setDate(prevDay.getDate() - 1);
-          const prevDateIso = safeIsoDate(prevDay);
-          if (prevDateIso && !guardDailyAssignments[`${gId}_${prevDateIso}`]) {
-            score += 20;
-            rationale.push('Rest Period Protected');
-          } else {
-            score += 10;
-          }
-        } else {
-          score += 15;
-        }
-
         // 5. Base Continuity
         score += 10;
 
@@ -350,15 +393,23 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           guardCode: g.guardId,
           agencyName: g.agency?.name || 'Direct Guard',
           shiftPreference: g.shiftPreference || 'Flexible',
-          matchScore: Math.max(10, Math.min(100, score)),
+          isPreferenceMismatch: isPrefMismatch,
+          isEligible,
+          disqualificationReason,
+          matchScore: isEligible ? Math.max(10, Math.min(100, score)) : 0,
           rationale
         });
       }
 
+      // Filter eligible guards only for system recommendation
+      const eligibleGuards = scoredGuards.filter(sg => sg.isEligible);
+      eligibleGuards.sort((a, b) => b.matchScore - a.matchScore);
       scoredGuards.sort((a, b) => b.matchScore - a.matchScore);
 
-      const topGuard = scoredGuards[0] || null;
-      if (topGuard && !guardDailyAssignments[`${topGuard.guardId}_${dateIso}`]) {
+      const topGuard = eligibleGuards[0] || null;
+      let isStaffShortage = !topGuard;
+
+      if (topGuard) {
         guardSimulatedShifts[topGuard.guardId] = (guardSimulatedShifts[topGuard.guardId] || 0) + 1;
         guardDailyAssignments[`${topGuard.guardId}_${dateIso}`] = true;
       }
@@ -375,8 +426,10 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
         endTime: r.endTime || '20:00',
         timing: timingStr,
         shiftLabel: r.shiftLabel || timingStr,
-        recommendedGuard: topGuard,
-        alternativeGuards: scoredGuards.slice(1, 5),
+        isStaffShortage,
+        status: isStaffShortage ? 'UNASSIGNED - NO ELIGIBLE GUARDS' : (r.status || 'Unassigned'),
+        recommendedGuard: isStaffShortage ? null : topGuard,
+        alternativeGuards: eligibleGuards.slice(isStaffShortage ? 0 : 1, 5),
         allScoredGuards: scoredGuards
       });
     }
@@ -479,6 +532,130 @@ router.put('/assign/:id', async (req: Request, res: Response): Promise<void> => 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to assign shift' });
+  }
+});
+
+router.post('/log-absence', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { rosterId, date, reason } = req.body;
+    if (!rosterId) {
+      res.status(400).json({ error: 'rosterId is required' });
+      return;
+    }
+
+    const roster = await (prisma as any).siteRoster.findUnique({
+      where: { id: String(rosterId) },
+      include: { guard: true, site: true }
+    });
+
+    if (!roster) {
+      res.status(404).json({ error: 'Shift schedule not found' });
+      return;
+    }
+
+    const exceptionDate = date ? new Date(date) : (roster.date || new Date());
+
+    // Create shift exception for absence
+    const exception = await (prisma as any).shiftException.create({
+      data: {
+        rosterId: roster.id,
+        date: exceptionDate,
+        type: 'Absent',
+        notes: reason || 'Guard absent - Client notification / Admin override'
+      }
+    });
+
+    // Update roster status to NEEDS REPLACEMENT
+    const updatedRoster = await (prisma as any).siteRoster.update({
+      where: { id: roster.id },
+      data: { status: 'NEEDS REPLACEMENT' }
+    });
+
+    res.json({
+      success: true,
+      message: 'Guard absence logged. Shift flagged as NEEDS REPLACEMENT.',
+      exception,
+      roster: updatedRoster
+    });
+  } catch (err: any) {
+    console.error('Log Absence Error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to log absence' });
+  }
+});
+
+router.get('/replacement-suggestions/:rosterId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rosterId = String(req.params.rosterId);
+    const roster = await (prisma as any).siteRoster.findUnique({
+      where: { id: rosterId },
+      include: { site: true, guard: true }
+    });
+
+    if (!roster) {
+      res.status(404).json({ error: 'Roster not found' });
+      return;
+    }
+
+    const dateIso = roster.date ? roster.date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const startHour = parseInt((roster.startTime || '08:00').split(':')[0], 10);
+    const isNightShift = startHour >= 18 || startHour < 6;
+
+    // Fetch all active guards except currently assigned guard
+    const availableGuards = await (prisma as any).guard.findMany({
+      where: {
+        id: { not: roster.guardId || '' },
+        NOT: {
+          status: { in: ['On Leave', 'ON_LEAVE', 'Inactive', 'INACTIVE', 'Suspended', 'SUSPENDED'] }
+        }
+      },
+      include: { agency: true }
+    });
+
+    const suggestions = availableGuards.map((g: any) => {
+      let score = 0;
+      const rationale: string[] = [];
+      const pref = (g.shiftPreference || 'Flexible').toLowerCase();
+      let isPrefMismatch = false;
+
+      if ((pref.includes('day') && !isNightShift) || (pref.includes('night') && isNightShift)) {
+        score += 40;
+        rationale.push(`Matches Shift Preference (${isNightShift ? 'Night' : 'Day'})`);
+      } else if (pref.includes('flexible') || !g.shiftPreference) {
+        score += 30;
+        rationale.push('Flexible Shift Preference');
+      } else {
+        score += 10;
+        isPrefMismatch = true;
+        rationale.push(`Preference Warning: ${g.shiftPreference} Guard on ${isNightShift ? 'Night' : 'Day'} Shift`);
+      }
+
+      score += 30; // Standby / Replacement Readiness
+      rationale.push('Active Backup Guard');
+
+      return {
+        guardId: g.id,
+        guardCode: g.guardId,
+        guardName: `${g.firstName} ${g.lastName}`.trim(),
+        agencyName: g.agency?.name || 'In-House',
+        shiftPreference: g.shiftPreference || 'Flexible',
+        isPreferenceMismatch: isPrefMismatch,
+        matchScore: Math.min(100, score),
+        rationale
+      };
+    });
+
+    suggestions.sort((a: any, b: any) => b.matchScore - a.matchScore);
+
+    res.json({
+      rosterId,
+      siteName: roster.site?.name || 'Contract Site',
+      date: dateIso,
+      shiftTiming: `${roster.startTime} - ${roster.endTime}`,
+      suggestions: suggestions.slice(0, 5)
+    });
+  } catch (err: any) {
+    console.error('Replacement Suggestions Error:', err);
+    res.status(500).json({ error: 'Failed to fetch replacement suggestions' });
   }
 });
 

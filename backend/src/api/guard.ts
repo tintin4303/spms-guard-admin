@@ -1,10 +1,9 @@
 import express from 'express';
 import { requireRole } from '../middleware/roleCheck';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Enforce JWT token authentication for all guard portal routes
 router.use(authenticateToken);

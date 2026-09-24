@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { MapPin, X } from 'lucide-react';
 
 interface LocationPickerProps {
   initialLat?: number | null;
@@ -94,8 +95,8 @@ export default function SiteLocationPicker({ initialLat, initialLng, onSelectLoc
             <h3 className="text-lg font-bold">Pick Site Geographic Location</h3>
             <p className="text-xs text-gray-400">Click anywhere on the map or search to drop pin</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl font-bold p-1">
-            ✕
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -138,7 +139,7 @@ export default function SiteLocationPicker({ initialLat, initialLng, onSelectLoc
               <div className="relative flex flex-col items-center">
                 <div className="w-8 h-8 bg-red-500/30 rounded-full animate-ping absolute -top-1"></div>
                 <div className="w-6 h-6 bg-red-600 rounded-full border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-lg">
-                  📍
+                  <MapPin className="w-3.5 h-3.5" />
                 </div>
               </div>
             </Marker>

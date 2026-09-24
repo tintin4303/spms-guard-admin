@@ -3,7 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma';
 
 dotenv.config();
 
@@ -15,7 +15,6 @@ export const io = new Server(httpServer, {
     methods: ['GET', 'POST']
   }
 });
-const prisma = new PrismaClient();
 
 const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 app.use(cors({ origin: allowedOrigin, credentials: true }));

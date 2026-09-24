@@ -269,6 +269,24 @@ export const createException = async (data: any) => {
   return response.json();
 };
 
+export const logAbsence = async (rosterId: string, reason?: string, date?: string) => {
+  const response = await authenticatedFetch(`${API_BASE_URL}/schedules/log-absence`, {
+    method: 'POST',
+    body: JSON.stringify({ rosterId, reason, date }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || 'Failed to log absence');
+  }
+  return response.json();
+};
+
+export const fetchReplacementSuggestions = async (rosterId: string) => {
+  const response = await authenticatedFetch(`${API_BASE_URL}/schedules/replacement-suggestions/${rosterId}`);
+  if (!response.ok) throw new Error('Failed to fetch replacement suggestions');
+  return response.json();
+};
+
 export const fetchLogs = async () => {
   const response = await authenticatedFetch(`${API_BASE_URL}/logs`);
   if (!response.ok) throw new Error('Failed to fetch logs');

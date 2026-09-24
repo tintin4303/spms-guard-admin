@@ -1,10 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-
+import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
 router.get('/attendance', async (req, res) => {
@@ -89,7 +87,8 @@ router.get('/', async (req, res) => {
       },
       orderBy: {
         timestamp: 'desc'
-      }
+      },
+      take: 100
     });
     res.json(logs);
   } catch (err) {

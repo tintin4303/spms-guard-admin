@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
 import { io } from '../index';
-
-const prisma = new PrismaClient();
 
 export const createAuditLog = async (data: {
   action: string;

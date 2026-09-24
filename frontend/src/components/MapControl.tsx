@@ -135,7 +135,26 @@ export default function MapControl({ user }: { user?: any }) {
     setViewingPath(null);
     setIsEditing(false);
     setPins([]);
-  }, [selectedSiteId]);
+
+    if (selectedSiteId && contracts.length > 0) {
+      const selectedSite = contracts
+        .flatMap((c: any) => c.sites || [])
+        .find((s: any) => String(s.id) === String(selectedSiteId));
+
+      if (selectedSite && selectedSite.latitude != null && selectedSite.longitude != null) {
+        const lat = typeof selectedSite.latitude === 'number' ? selectedSite.latitude : parseFloat(selectedSite.latitude);
+        const lng = typeof selectedSite.longitude === 'number' ? selectedSite.longitude : parseFloat(selectedSite.longitude);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setViewState(prev => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            zoom: 16
+          }));
+        }
+      }
+    }
+  }, [selectedSiteId, contracts]);
 
   const activePins = viewingPath ? (isEditing ? editPins : viewingPath.pins) : pins;
 
@@ -460,6 +479,28 @@ export default function MapControl({ user }: { user?: any }) {
                 />
               </Source>
             )}
+
+            {/* Selected Site Marker */}
+            {(() => {
+              const selectedSite = selectedSiteId && contracts.length > 0
+                ? contracts.flatMap((c: any) => c.sites || []).find((s: any) => String(s.id) === String(selectedSiteId))
+                : null;
+              if (!selectedSite || selectedSite.latitude == null || selectedSite.longitude == null) return null;
+              const sLat = typeof selectedSite.latitude === 'number' ? selectedSite.latitude : parseFloat(selectedSite.latitude);
+              const sLng = typeof selectedSite.longitude === 'number' ? selectedSite.longitude : parseFloat(selectedSite.longitude);
+              if (isNaN(sLat) || isNaN(sLng)) return null;
+
+              return (
+                <Marker longitude={sLng} latitude={sLat}>
+                  <div className="relative flex flex-col items-center justify-center group z-20">
+                    <div className="bg-red-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-lg border border-white/80 mb-1 whitespace-nowrap flex items-center gap-1">
+                      <span>📍</span> {selectedSite.name} (Site Center)
+                    </div>
+                    <div className="w-3.5 h-3.5 bg-red-600 border-2 border-white rounded-full shadow-xl"></div>
+                  </div>
+                </Marker>
+              );
+            })()}
 
             {/* Markers */}
             {activePins.map((pin: any, idx: number) => (

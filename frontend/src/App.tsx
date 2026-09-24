@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Calendar, Download } from 'lucide-react';
+import { ShieldAlert, Users, FileText, CheckCircle2, AlertTriangle, Calendar, Download, ChevronLeft, ChevronRight, UserX, AlertCircle, UserCheck, MapPin, X, Check } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import DashboardLayout from './components/DashboardLayout';
@@ -14,7 +14,7 @@ import GuardLayout from './components/GuardLayout';
 import GuardDashboard from './pages/guard/Dashboard';
 import GuardMyShifts from './pages/guard/MyShifts';
 import GuardReportIncident from './pages/guard/ReportIncident';
-import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, generateSchedules, assignGuard, fetchLogs, fetchAttendanceLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident, provisionGuardAccount, batchAssignGuard, fetchAutoScheduleRecommendations } from './api';
+import { fetchGuards, fetchContracts, createContract, updateContract, deleteContract, createGuard, updateGuard, deleteGuard, loginUser, fetchUsers, createUser, deleteUser, fetchSchedules, generateSchedules, assignGuard, fetchLogs, fetchAttendanceLogs, fetchReportsOverview, fetchGuardPerformance, createRoster, deleteRoster, createException, toggleGuardVisibility, resolveIncident, provisionGuardAccount, batchAssignGuard, fetchAutoScheduleRecommendations, logAbsence, fetchReplacementSuggestions } from './api';
 
 function Login({ onLogin }: { onLogin: (u: any) => void }) {
   const [email, setEmail] = useState('');
@@ -884,11 +884,19 @@ function Contracts() {
                       <div>
                         <label className="block text-[12px] font-medium text-gray-700 mb-1">Site Type</label>
                         <select value={site.siteType} onChange={e => updateSiteField(i, 'siteType', e.target.value)} className="w-full border rounded px-3 py-1.5 text-[14px]">
-                          <option value="Residential">Residential / Condo</option>
-                          <option value="Warehouse">Warehouse & Logistics</option>
-                          <option value="Retail">Retail & Commercial</option>
+                          <option value="Hospital">Hospital &amp; Healthcare</option>
+                          <option value="University">University &amp; Campus</option>
+                          <option value="School">School &amp; Educational Institute</option>
+                          <option value="Government">Government &amp; Public Facility</option>
+                          <option value="Hotel">Hotel &amp; Hospitality</option>
+                          <option value="Industrial">Industrial &amp; Factory / Plant</option>
+                          <option value="Bank">Bank &amp; Financial Branch</option>
+                          <option value="Venue">Event Venue &amp; Stadium</option>
+                          <option value="Residential">Residential / Condo / Housing</option>
+                          <option value="Warehouse">Warehouse &amp; Logistics</option>
+                          <option value="Retail">Retail &amp; Commercial Mall</option>
                           <option value="Construction">Construction Site</option>
-                          <option value="Corporate">Corporate Office</option>
+                          <option value="Corporate">Corporate Office / Headquarters</option>
                         </select>
                       </div>
                     </div>
@@ -902,7 +910,8 @@ function Contracts() {
                           onClick={() => setPickerSiteIndex(i)}
                           className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded text-[12px] font-semibold flex items-center gap-1 shadow-sm shrink-0"
                         >
-                          📍 {site.latitude && site.longitude ? `${site.latitude.toFixed(4)}, ${site.longitude.toFixed(4)}` : 'Pick Pin'}
+                          <MapPin className="w-3.5 h-3.5" />
+                          {site.latitude && site.longitude ? `${site.latitude.toFixed(4)}, ${site.longitude.toFixed(4)}` : 'Pick Pin'}
                         </button>
                       </div>
                     </div>
@@ -1277,6 +1286,10 @@ function Schedules({ role }: { role?: string }) {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [guards, setGuards] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'monthly'>('monthly');
+  const [currentMonthDate, setCurrentMonthDate] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
     const today = new Date();
     today.setDate(today.getDate() - today.getDay());
@@ -1305,26 +1318,83 @@ function Schedules({ role }: { role?: string }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAssigning, setIsAssigning] = useState<any>(null);
 
+  // Guard Absence & 1-Click Replacement State
+  const [isLoggingAbsence, setIsLoggingAbsence] = useState<any>(null);
+  const [absenceReason, setAbsenceReason] = useState('');
+  const [replacementData, setReplacementData] = useState<any>(null);
+  const [isLoadingReplacement, setIsLoadingReplacement] = useState(false);
+
+  const handleOpenReplacementModal = async (sched: any) => {
+    setIsLoadingReplacement(true);
+    setReplacementData(null);
+    try {
+      const res = await fetchReplacementSuggestions(sched.id || sched.rosterId);
+      setReplacementData({ ...res, targetRoster: sched });
+    } catch (err: any) {
+      alert('Failed to load replacement guard recommendations.');
+    } finally {
+      setIsLoadingReplacement(false);
+    }
+  };
+
+  const handleConfirmAbsence = async (e: any) => {
+    e.preventDefault();
+    if (!isLoggingAbsence) return;
+    try {
+      await logAbsence(isLoggingAbsence.id, absenceReason || 'Admin Logged Guard Absence');
+      const targetRoster = isLoggingAbsence;
+      setIsLoggingAbsence(null);
+      setAbsenceReason('');
+      loadSchedules();
+      // Automatically prompt 1-click replacement options
+      handleOpenReplacementModal(targetRoster);
+    } catch (err: any) {
+      alert(err.message || 'Failed to log absence');
+    }
+  };
+
   const loadSchedules = () => {
-    // If a site is selected, we could pass it to fetchSchedules, but we can also just filter client-side.
-    // We already fetch all restricted schedules on backend.
-    fetchSchedules().then(setSchedules).catch(console.error);
+    const year = currentMonthDate.getFullYear();
+    const month = currentMonthDate.getMonth();
+    const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const sFilter = siteFilter === 'All Sites' ? undefined : siteFilter;
+    fetchSchedules(sFilter, startDate, endDate).then(setSchedules).catch(console.error);
   };
 
   useEffect(() => {
     loadSchedules();
+  }, [currentMonthDate, siteFilter]);
+
+  useEffect(() => {
+    fetchContracts().then(setContracts).catch(console.error);
     if (role === 'OPERATION_MANAGER' || !role) {
       fetchGuards().then(setGuards).catch(console.error);
-      fetchContracts().then(setContracts).catch(console.error);
     }
   }, [role]);
 
-  // Extract available sites from schedules so it works for all roles without full contracts access
-  const uniqueSites = Array.from(
-    new Map(
-      schedules.filter(s => s.site).map(s => [s.site.id, s.site])
-    ).values()
-  ) as any[];
+  // Combined site list from both contracts (including newly added sites with 0 slots) and existing schedules
+  const allAvailableSites = useMemo(() => {
+    const map = new Map<string, any>();
+    contracts.forEach(c => {
+      if (c.sites) {
+        c.sites.forEach((s: any) => {
+          map.set(s.id, {
+            ...s,
+            contract: s.contract || { id: c.id, clientCompanyName: c.clientCompanyName }
+          });
+        });
+      }
+    });
+    schedules.forEach(sched => {
+      if (sched.site && sched.site.id && !map.has(sched.site.id)) {
+        map.set(sched.site.id, sched.site);
+      }
+    });
+    return Array.from(map.values());
+  }, [contracts, schedules]);
+
+  const uniqueSites = allAvailableSites;
 
   // Full global sites extracted straight from contracts for Ops deployment menu
   const allGlobalSites = useMemo(() => {
@@ -1389,10 +1459,16 @@ function Schedules({ role }: { role?: string }) {
   };
   const weekDays = getNext7Days();
 
+  const [isSubmittingRoster, setIsSubmittingRoster] = useState(false);
   const handleRosterSubmit = async (e: any) => {
     e.preventDefault();
+    if (isSubmittingRoster) return;
+    setIsSubmittingRoster(true);
     setErrorMsg('');
-    if (!formData.guardId || !formData.siteId) return setErrorMsg('Guard and Site are required.');
+    if (!formData.guardId || !formData.siteId) {
+      setIsSubmittingRoster(false);
+      return setErrorMsg('Guard and Site are required.');
+    }
 
     const selectedGuard = guards.find(g => g.id === formData.guardId);
     if (selectedGuard && selectedGuard.shiftPreference) {
@@ -1405,7 +1481,10 @@ function Schedules({ role }: { role?: string }) {
 
       if (mismatch) {
         const confirmMsg = `Caution: You are assigning a ${isNightShift ? 'Night' : 'Day'} shift to a guard who prefers ${selectedGuard.shiftPreference} shifts. Do you want to proceed?`;
-        if (!window.confirm(confirmMsg)) return;
+        if (!window.confirm(confirmMsg)) {
+          setIsSubmittingRoster(false);
+          return;
+        }
       }
     }
 
@@ -1415,23 +1494,34 @@ function Schedules({ role }: { role?: string }) {
       loadSchedules();
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred.');
+    } finally {
+      setIsSubmittingRoster(false);
     }
   };
 
+  const [isSubmittingException, setIsSubmittingException] = useState(false);
   const handleExceptionSubmit = async (e: any) => {
     e.preventDefault();
+    if (isSubmittingException) return;
+    setIsSubmittingException(true);
     setErrorMsg('');
-    if (formData.type === 'Swap' && !formData.replacementGuardId) return setErrorMsg('Replacement guard is required for a Swap.');
+    if (formData.type === 'Swap' && !formData.replacementGuardId) {
+      setIsSubmittingException(false);
+      return setErrorMsg('Replacement guard is required for a Swap.');
+    }
     try {
       await createException({ date: formData.date, type: formData.type, rosterId: formData.rosterId, replacementGuardId: formData.replacementGuardId });
       setIsCreatingException(false);
       loadSchedules();
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred.');
+    } finally {
+      setIsSubmittingException(false);
     }
   };
 
   const [isGeneratingSlots, setIsGeneratingSlots] = useState(false);
+  const [isSubmittingSlotGen, setIsSubmittingSlotGen] = useState(false);
   const [ungeneratedPageIndex, setUngeneratedPageIndex] = useState(0);
   const [unassignedPageIndex, setUnassignedPageIndex] = useState(0);
   const [generateSlotData, setGenerateSlotData] = useState({
@@ -1442,6 +1532,8 @@ function Schedules({ role }: { role?: string }) {
 
   const handleGenerateSlotsSubmit = async (e: any) => {
     e.preventDefault();
+    if (isSubmittingSlotGen) return;
+    setIsSubmittingSlotGen(true);
     setErrorMsg('');
     try {
       const res = await generateSchedules({
@@ -1454,10 +1546,13 @@ function Schedules({ role }: { role?: string }) {
       loadSchedules();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to generate shift slots');
+    } finally {
+      setIsSubmittingSlotGen(false);
     }
   };
 
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
+  const [isSubmittingBatchAssign, setIsSubmittingBatchAssign] = useState(false);
   const [batchFormData, setBatchFormData] = useState({
     siteId: '',
     startDate: new Date().toISOString().split('T')[0],
@@ -1469,8 +1564,13 @@ function Schedules({ role }: { role?: string }) {
 
   const handleBatchAssignSubmit = async (e: any) => {
     e.preventDefault();
+    if (isSubmittingBatchAssign) return;
+    setIsSubmittingBatchAssign(true);
     setErrorMsg('');
-    if (!batchFormData.siteId || !batchFormData.guardId) return setErrorMsg('Site and Guard are required');
+    if (!batchFormData.siteId || !batchFormData.guardId) {
+      setIsSubmittingBatchAssign(false);
+      return setErrorMsg('Site and Guard are required');
+    }
     try {
       const res = await batchAssignGuard(batchFormData);
       setIsBatchAssigning(false);
@@ -1478,11 +1578,14 @@ function Schedules({ role }: { role?: string }) {
       loadSchedules();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to batch assign guard');
+    } finally {
+      setIsSubmittingBatchAssign(false);
     }
   };
 
   const [isAutoScheduling, setIsAutoScheduling] = useState(false);
   const [isCalculatingAutoSchedule, setIsCalculatingAutoSchedule] = useState(false);
+  const [isSubmittingAutoSchedule, setIsSubmittingAutoSchedule] = useState(false);
   const [autoScheduleFilter, setAutoScheduleFilter] = useState({
     siteId: '',
     startDate: new Date().toISOString().split('T')[0],
@@ -1523,9 +1626,12 @@ function Schedules({ role }: { role?: string }) {
   };
 
   const handleApplyAutoScheduleSubmit = async () => {
+    if (isSubmittingAutoSchedule) return;
+    setIsSubmittingAutoSchedule(true);
     setErrorMsg('');
     const targetRosterIds = Object.keys(acceptedRosterMap).filter(rId => acceptedRosterMap[rId] && selectedGuardMap[rId]);
     if (targetRosterIds.length === 0) {
+      setIsSubmittingAutoSchedule(false);
       return setErrorMsg('No assignments selected to apply.');
     }
 
@@ -1541,13 +1647,21 @@ function Schedules({ role }: { role?: string }) {
       loadSchedules();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error applying recommendations');
+    } finally {
+      setIsSubmittingAutoSchedule(false);
     }
   };
 
+  const [isSubmittingAssignGuard, setIsSubmittingAssignGuard] = useState(false);
   const handleAssignGuardSubmit = async (e: any) => {
     e.preventDefault();
+    if (isSubmittingAssignGuard) return;
+    setIsSubmittingAssignGuard(true);
     setErrorMsg('');
-    if (!formData.guardId) return setErrorMsg('Select a guard first');
+    if (!formData.guardId) {
+      setIsSubmittingAssignGuard(false);
+      return setErrorMsg('Select a guard first');
+    }
     try {
       await assignGuard(isAssigning.id, formData.guardId);
       setIsAssigning(null);
@@ -1555,7 +1669,239 @@ function Schedules({ role }: { role?: string }) {
       loadSchedules();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to assign guard due to constraints');
+    } finally {
+      setIsSubmittingAssignGuard(false);
     }
+  };
+
+  const [isExportingModalOpen, setIsExportingModalOpen] = useState(false);
+  const [exportScope, setExportScope] = useState({
+    siteId: 'All Sites',
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]
+  });
+
+  const getFilteredSchedulesForExport = () => {
+    return schedules.filter(s => {
+      const matchSite = exportScope.siteId === 'All Sites' || s.siteId === exportScope.siteId || s.site?.id === exportScope.siteId;
+      if (!matchSite) return false;
+      if (!s.date) return true;
+      const sDate = s.date.split('T')[0];
+      return sDate >= exportScope.startDate && sDate <= exportScope.endDate;
+    });
+  };
+
+  const handleExportCSV = () => {
+    const records = getFilteredSchedulesForExport();
+    if (records.length === 0) {
+      alert('No schedule records found for the selected export range.');
+      return;
+    }
+
+    const headers = [
+      'Date',
+      'Day of Week',
+      'Site Name',
+      'Site Type',
+      'Site Address',
+      'Shift Label',
+      'Start Time',
+      'End Time',
+      'Post / Slot',
+      'Guard ID',
+      'Guard Name',
+      'Guard Preference',
+      'Agency Vendor',
+      'Operational Status'
+    ];
+
+    const rows = records.map(s => {
+      const d = s.date ? new Date(s.date) : new Date();
+      const dateStr = s.date ? s.date.split('T')[0] : 'N/A';
+      const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const siteName = formatSiteName(s.site);
+      const siteType = s.site?.siteType || 'N/A';
+      const address = (s.site?.address || '').replace(/"/g, '""');
+      const shiftLabel = (s.shiftLabel || '').replace(/"/g, '""');
+      const startTime = s.startTime || '';
+      const endTime = s.endTime || '';
+      const postName = s.postName || 'Post 1';
+      const guardId = s.guard?.guardId || 'UNASSIGNED';
+      const guardName = role === 'CLIENT' ? 'RESTRICTED' : formatGuardName(s.guard);
+      const guardPref = s.guard?.shiftPreference || 'Flexible';
+      const agencyName = s.guard?.agency?.name || (s.guard ? 'In-House' : 'N/A');
+      const status = s.status || 'Scheduled';
+
+      return [
+        `"${dateStr}"`,
+        `"${dayOfWeek}"`,
+        `"${siteName}"`,
+        `"${siteType}"`,
+        `"${address}"`,
+        `"${shiftLabel}"`,
+        `"${startTime}"`,
+        `"${endTime}"`,
+        `"${postName}"`,
+        `"${guardId}"`,
+        `"${guardName}"`,
+        `"${guardPref}"`,
+        `"${agencyName}"`,
+        `"${status}"`
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `SPMS_Operational_Schedule_Report_${exportScope.startDate}_to_${exportScope.endDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsExportingModalOpen(false);
+  };
+
+  const handlePrintReport = () => {
+    const records = getFilteredSchedulesForExport();
+    if (records.length === 0) {
+      alert('No schedule records found for the selected export range.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return alert('Please allow popups to open print preview.');
+
+    const totalShifts = records.length;
+    const assignedShifts = records.filter(s => s.guardId && s.status !== 'Unassigned').length;
+    const unassignedShifts = totalShifts - assignedShifts;
+    const coveragePercent = Math.round((assignedShifts / (totalShifts || 1)) * 100);
+
+    const siteSelectedName = exportScope.siteId === 'All Sites' 
+      ? 'All Operational Sites' 
+      : (uniqueSites.find((s: any) => s.id === exportScope.siteId)?.name || 'Selected Site');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>SPMS Security Operations Report — ${siteSelectedName}</title>
+          <style>
+            @media print {
+              @page { size: A4 landscape; margin: 12mm; }
+              body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0F172A; margin: 0; padding: 0; background: #fff; }
+              .no-print { display: none !important; }
+            }
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0F172A; padding: 24px; background: #f8fafc; }
+            .report-card { background: white; border: 1px solid #cbd5e1; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 1100px; margin: 0 auto; }
+            .header-flex { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1E3A5F; padding-bottom: 16px; margin-bottom: 20px; }
+            .logo-title { font-size: 22px; font-weight: 800; color: #1E3A5F; letter-spacing: -0.5px; }
+            .logo-subtitle { font-size: 13px; color: #64748B; margin-top: 4px; }
+            .meta-block { text-align: right; font-size: 12px; color: #475569; }
+            .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+            .stat-box { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
+            .stat-label { font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; }
+            .stat-value { font-size: 20px; font-weight: 800; color: #1E3A5F; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 24px; }
+            th { background: #1E3A5F; color: white; padding: 8px 10px; text-align: left; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+            td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+            tr:nth-child(even) { background: #f8fafc; }
+            .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+            .badge-assigned { background: #dcfce7; color: #166534; }
+            .badge-unassigned { background: #fef3c7; color: #92400e; }
+            .signature-flex { display: flex; justify-content: space-between; margin-top: 40px; pt-20px; border-top: 1px solid #e2e8f0; }
+            .sig-box { width: 45%; text-align: center; font-size: 12px; color: #475569; }
+            .sig-line { border-bottom: 1px solid #94a3b8; margin-top: 40px; margin-bottom: 8px; }
+            .btn-print { background: #1E3A5F; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-bottom: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="text-align: right; max-width: 1100px; margin: 0 auto;">
+            <button onclick="window.print()" class="btn-print">🖨️ Print / Save as PDF</button>
+          </div>
+          <div class="report-card">
+            <div class="header-flex">
+              <div>
+                <div class="logo-title">SPMS Security Operations Command Center</div>
+                <div class="logo-subtitle">Official Guard Duty Roster & Operational Schedule Report</div>
+              </div>
+              <div class="meta-block">
+                <div><strong>Scope:</strong> ${siteSelectedName}</div>
+                <div><strong>Period:</strong> ${exportScope.startDate} to ${exportScope.endDate}</div>
+                <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+              </div>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-box">
+                <div class="stat-label">Total Roster Slots</div>
+                <div class="stat-value">${totalShifts}</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-label">Guards Assigned</div>
+                <div class="stat-value" style="color: #166534">${assignedShifts}</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-label">Unassigned Shifts</div>
+                <div class="stat-value" style="color: #92400e">${unassignedShifts}</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-label">Coverage Rate</div>
+                <div class="stat-value" style="color: #2563eb">${coveragePercent}%</div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Shift & Timing</th>
+                  <th>Patrol Site</th>
+                  <th>Assigned Guard</th>
+                  <th>Guard ID</th>
+                  <th>Vendor / Agency</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${records.map(s => `
+                  <tr>
+                    <td><strong>${s.date ? s.date.split('T')[0] : 'N/A'}</strong> (${s.date ? new Date(s.date).toLocaleDateString('en-US', { weekday: 'short' }) : ''})</td>
+                    <td>${s.shiftLabel || `${s.startTime || '08:00'} - ${s.endTime || '20:00'}`}</td>
+                    <td>${formatSiteName(s.site)}</td>
+                    <td>${role === 'CLIENT' ? 'Restricted' : formatGuardName(s.guard)}</td>
+                    <td>${s.guard?.guardId || '—'}</td>
+                    <td>${s.guard?.agency?.name || (s.guard ? 'In-House' : 'Unassigned')}</td>
+                    <td>
+                      <span class="badge ${s.guardId && s.status !== 'Unassigned' ? 'badge-assigned' : 'badge-unassigned'}">
+                        ${s.status || 'Scheduled'}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="signature-flex">
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div><strong>Prepared By:</strong> Operations Manager</div>
+                <div>SPMS Security Operations Command</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div><strong>Approved By:</strong> Client Representative</div>
+                <div>Facility Management & Security Audit</div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setIsExportingModalOpen(false);
   };
 
   const filteredSchedules = schedules.filter(s => {
@@ -1583,17 +1929,18 @@ function Schedules({ role }: { role?: string }) {
     const unassignedShifts = schedules.filter(s => s.guardId == null || s.status === 'Unassigned');
     if (unassignedShifts.length === 0) return [];
 
-    const groups: { [key: string]: { siteName: string; timing: string; dates: Date[]; count: number } } = {};
+    const groups: { [key: string]: { siteId: string; siteName: string; timing: string; dates: Date[]; count: number } } = {};
 
     unassignedShifts.forEach(s => {
+      const sId = s.siteId || s.site?.id || 'unknown';
       const siteName = formatSiteName(s.site);
-      const timing = s.shiftLabel ? s.shiftLabel.split(' (')[1]?.replace(')', '') || '08:00 - 20:00' : `${s.startTime || '08:00'} - ${s.endTime || '20:00'}`;
-      const key = `${s.siteId}_${timing}`;
+      const timing = s.shiftLabel ? (s.shiftLabel.split(' (')[1]?.replace(')', '') || s.shiftLabel) : `${s.startTime || '08:00'} - ${s.endTime || '20:00'}`;
+      const key = `${sId}_${timing}`;
 
       const d = s.date ? new Date(s.date) : new Date();
 
       if (!groups[key]) {
-        groups[key] = { siteName, timing, dates: [d], count: 1 };
+        groups[key] = { siteId: sId, siteName, timing, dates: [d], count: 1 };
       } else {
         groups[key].dates.push(d);
         groups[key].count++;
@@ -1936,15 +2283,30 @@ function Schedules({ role }: { role?: string }) {
                     <td className="px-6 py-4 text-[14px] text-[#475569]">{formatSiteName(sched.site)}</td>
                     <td className="px-6 py-4 text-[14px] text-[#475569]">{role === 'CLIENT' ? 'ID HIDDEN' : sched.guard?.guardId} ({formatGuardName(sched.guard)})</td>
                     <td className="px-6 py-4">
-                      <span className={`text-[14px] ${sched.status === 'Pending Reassignment' ? 'text-orange-600' : 'text-green-700'}`}>
-                        {sched.status || 'Scheduled'}
-                      </span>
+                      {sched.status === 'NEEDS REPLACEMENT' || sched.status?.includes('SHORTAGE') ? (
+                        <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2.5 py-1 rounded text-[12px]">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                          {sched.status === 'NEEDS REPLACEMENT' ? 'Needs Replacement' : 'Staff Shortage'}
+                        </span>
+                      ) : (
+                        <span className={`text-[14px] font-medium ${sched.status === 'Pending Reassignment' ? 'text-amber-700 font-semibold' : 'text-emerald-700'}`}>
+                          {sched.status || 'Scheduled'}
+                        </span>
+                      )}
                     </td>
                     {isOps && (
                       <td className="px-6 py-4 flex gap-2 border-b-0 items-center h-[52px]">
-                        {sched.status === 'Unassigned' ? (
+                        {sched.status === 'Unassigned' || sched.status?.includes('SHORTAGE') ? (
                           <>
-                            <button onClick={() => { setFormData({...defaultFormData}); setIsAssigning(sched); }} className="px-3 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[12px] font-medium hover:bg-green-100">Assign Guard</button>
+                            <button onClick={() => { setFormData({...defaultFormData}); setIsAssigning(sched); }} className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded text-[12px] font-semibold hover:bg-emerald-100">Assign Guard</button>
+                            <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
+                          </>
+                        ) : sched.status === 'NEEDS REPLACEMENT' ? (
+                          <>
+                            <button onClick={() => handleOpenReplacementModal(sched)} className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[12px] font-bold hover:bg-amber-100 flex items-center gap-1">
+                              <UserCheck className="w-3.5 h-3.5 text-amber-700" />
+                              Find Replacement
+                            </button>
                             <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
                           </>
                         ) : (
@@ -1952,8 +2314,9 @@ function Schedules({ role }: { role?: string }) {
                             {sched.status?.includes('Permanent') && (
                               <button onClick={() => handleDeleteRoster(sched.rosterId)} className="text-[13px] text-red-600 hover:underline">Delete Post</button>
                             )}
+                            <button onClick={() => setIsLoggingAbsence(sched)} className="text-[13px] text-amber-800 hover:underline font-medium">Log Absence</button>
                             <button onClick={() => openCreateException(sched)} className="text-[13px] text-blue-600 hover:underline">Override</button>
-                            <button onClick={() => { setFormData({...defaultFormData}); setIsAssigning(sched); }} className="text-[13px] text-orange-600 hover:underline">Reassign</button>
+                            <button onClick={() => { setFormData({...defaultFormData}); setIsAssigning(sched); }} className="text-[13px] text-slate-700 hover:underline">Reassign</button>
                             <button onClick={() => handleDeleteRoster(sched.id)} className="text-[13px] text-red-600 hover:underline">Delete</button>
                           </>
                         )}
@@ -2071,78 +2434,127 @@ function Schedules({ role }: { role?: string }) {
 
       {viewMode === 'monthly' && (
         <div className="p-6 bg-[#F8FAFC]">
+          {/* Month Header Navigation Bar */}
+          <div className="flex justify-between items-center mb-4 bg-white p-3.5 rounded-xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center gap-3">
+              <h3 className="text-[16px] font-bold text-[#1E3A5F]">
+                {currentMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h3>
+              <span className="text-[12px] text-gray-500 font-medium">
+                ({new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 0).getDate()} Days)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-[13px] font-bold text-[#1E3A5F] hover:bg-gray-50 shadow-2xs transition-colors"
+              >
+                ← Prev Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentMonthDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
+                className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[12px] font-bold hover:bg-blue-100 transition-colors shadow-2xs"
+              >
+                Current Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-[13px] font-bold text-[#1E3A5F] hover:bg-gray-50 shadow-2xs transition-colors"
+              >
+                Next Month →
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-7 gap-3 min-w-[1000px]">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="font-bold text-center text-[#1E3A5F] text-[13px] py-1">{d}</div>
             ))}
-            {/* Generate 35 days for monthly grid */}
-            {Array.from({ length: 35 }).map((_, i) => {
-               const d = new Date();
-               d.setDate(d.getDate() - d.getDay() + i); // Start from previous Sunday
-               const year = d.getFullYear();
-               const month = String(d.getMonth() + 1).padStart(2, '0');
-               const day = String(d.getDate()).padStart(2, '0');
-               const dStr = `${year}-${month}-${day}`;
-               
-               const dayS = filteredSchedules.filter(s => {
-                 if (!s.date) return false;
-                 const sDate = new Date(s.date);
-                 const sY = sDate.getFullYear();
-                 const sM = String(sDate.getMonth() + 1).padStart(2, '0');
-                 const sD = String(sDate.getDate()).padStart(2, '0');
-                 return `${sY}-${sM}-${sD}` === dStr;
-               });
+            {(() => {
+              const targetYear = currentMonthDate.getFullYear();
+              const targetMonth = currentMonthDate.getMonth();
+              const firstDay = new Date(targetYear, targetMonth, 1);
+              const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+              const startDayOfWeek = firstDay.getDay(); // 0 = Sun
+              const totalCells = Math.ceil((startDayOfWeek + daysInMonth) / 7) * 7;
+              const gridStartDate = new Date(targetYear, targetMonth, 1 - startDayOfWeek);
 
-               const todayStr = (() => {
-                 const t = new Date();
-                 return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-               })();
-               const isToday = dStr === todayStr;
-               const unassigned = dayS.filter(s => s.guardId == null || s.status === 'Unassigned').length;
-               const totalSites = Array.from(new Set(dayS.map(s => s.siteId))).length;
-               
-               const handleDayClick = () => {
-                 const weekStart = new Date(d);
-                 weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-                 setCurrentWeekStart(weekStart);
-                 setViewMode('calendar');
-               };
+              return Array.from({ length: totalCells }).map((_, i) => {
+                const d = new Date(gridStartDate.getFullYear(), gridStartDate.getMonth(), gridStartDate.getDate() + i);
+                const isCurrentMonthCell = d.getMonth() === targetMonth;
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const dStr = `${year}-${month}-${day}`;
+                
+                const dayS = filteredSchedules.filter(s => {
+                  if (!s.date) return false;
+                  const sDate = new Date(s.date);
+                  const sY = sDate.getFullYear();
+                  const sM = String(sDate.getMonth() + 1).padStart(2, '0');
+                  const sD = String(sDate.getDate()).padStart(2, '0');
+                  return `${sY}-${sM}-${sD}` === dStr;
+                });
 
-               return (
-                 <div
-                   key={i}
-                   onClick={handleDayClick}
-                   className={`border rounded-xl h-[105px] flex flex-col p-2.5 bg-white cursor-pointer hover:border-blue-500 hover:shadow-lg transition-all relative overflow-hidden group ${isToday ? 'ring-2 ring-blue-500 bg-blue-50/10' : 'border-gray-200'}`}
-                 >
-                   <div className="flex justify-between items-center">
-                     <span className={`text-[13px] font-bold ${isToday ? 'text-blue-600 bg-blue-100 px-1.5 rounded' : 'text-gray-700'}`}>{d.getDate()}</span>
-                     {dayS.length > 0 && (
-                       <span className={`w-2 h-2 rounded-full ${unassigned > 0 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                     )}
-                   </div>
+                const todayStr = (() => {
+                  const t = new Date();
+                  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+                })();
+                const isToday = dStr === todayStr;
+                const unassigned = dayS.filter(s => s.guardId == null || s.status === 'Unassigned').length;
+                const totalSites = Array.from(new Set(dayS.map(s => s.siteId || s.site?.id).filter(Boolean))).length;
+                
+                const handleDayClick = () => {
+                  if (!isCurrentMonthCell) return;
+                  const weekStart = new Date(d);
+                  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+                  setCurrentWeekStart(weekStart);
+                  setViewMode('calendar');
+                };
 
-                   {dayS.length > 0 ? (
-                     <div className="flex flex-col gap-1 mt-auto">
-                       <div className="text-[11px] text-gray-500 font-medium truncate">
-                         {totalSites} {totalSites === 1 ? 'Site' : 'Sites'} • {dayS.length} {dayS.length === 1 ? 'Shift' : 'Shifts'}
-                       </div>
-                       {unassigned > 0 ? (
-                         <div className="bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex justify-between items-center shadow-2xs group-hover:bg-red-100 transition-colors">
-                           <span>Missing: {unassigned}</span>
-                           <span className="text-[10px]">Assign →</span>
-                         </div>
-                       ) : (
-                         <div className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                           ✓ Fully Covered
-                         </div>
-                       )}
-                     </div>
-                   ) : (
-                     <span className="text-[11px] text-gray-300 mt-auto text-center font-normal">No Activity</span>
-                   )}
-                 </div>
-               );
-            })}
+                return (
+                  <div
+                    key={i}
+                    onClick={handleDayClick}
+                    className={`border rounded-xl h-[105px] flex flex-col p-2.5 cursor-pointer hover:border-blue-500 hover:shadow-lg transition-all relative overflow-hidden group ${
+                      !isCurrentMonthCell ? 'bg-gray-50/70 border-gray-100 opacity-50' : isToday ? 'ring-2 ring-blue-500 bg-blue-50/10 border-blue-200' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className={`text-[13px] font-bold ${!isCurrentMonthCell ? 'text-gray-400' : isToday ? 'text-blue-600 bg-blue-100 px-1.5 rounded' : 'text-gray-700'}`}>
+                        {d.getDate()}
+                      </span>
+                      {isCurrentMonthCell && dayS.length > 0 && (
+                        <span className={`w-2 h-2 rounded-full ${unassigned > 0 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
+                      )}
+                    </div>
+
+                    {isCurrentMonthCell && dayS.length > 0 ? (
+                      <div className="flex flex-col gap-1 mt-auto">
+                        <div className="text-[11px] text-gray-500 font-medium truncate">
+                          {totalSites} {totalSites === 1 ? 'Site' : 'Sites'} • {dayS.length} {dayS.length === 1 ? 'Shift' : 'Shifts'}
+                        </div>
+                        {unassigned > 0 ? (
+                          <div className="bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex justify-between items-center shadow-2xs group-hover:bg-red-100 transition-colors">
+                            <span>Missing: {unassigned}</span>
+                            <span className="text-[10px]">Assign →</span>
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                            ✓ Fully Covered
+                          </div>
+                        )}
+                      </div>
+                    ) : isCurrentMonthCell ? (
+                      <span className="text-[11px] text-gray-300 mt-auto text-center font-normal">No Activity</span>
+                    ) : null}
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}
@@ -2411,27 +2823,38 @@ function Schedules({ role }: { role?: string }) {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-[12px] text-slate-500 font-medium mt-1">No unassigned guard available matching requirements for this date.</p>
+                            <div className="mt-2 text-[12px] bg-amber-50 text-amber-800 border border-amber-200 rounded px-2.5 py-1.5 font-medium flex items-center gap-1.5">
+                              <span>Staff Shortage: No eligible guard available matching legal 1 shift/day limit & preference rules for this date.</span>
+                            </div>
                           )}
                         </div>
                       </div>
 
                       {/* Right: Guard Override Selector */}
-                      <div className="w-full md:w-64 flex flex-col justify-center border-t md:border-t-0 md:border-l border-gray-100 md:pl-4 pt-2 md:pt-0">
+                      <div className="w-full md:w-72 flex flex-col justify-center border-t md:border-t-0 md:border-l border-gray-100 md:pl-4 pt-2 md:pt-0">
                         <label className="block text-[11px] font-semibold text-slate-500 mb-1">Assigned Guard (Override)</label>
                         <select
                           value={chosenGuardId}
                           onChange={e => setSelectedGuardMap({ ...selectedGuardMap, [rec.rosterId]: e.target.value })}
                           className="w-full border rounded px-2.5 py-1.5 text-[12px] bg-white border-gray-300 focus:outline-none focus:border-[#1E3A5F] font-medium"
                         >
-                          <option value="">Select Guard...</option>
+                          <option value="">{topGuard ? 'Select Guard...' : 'No Eligible Guard Available'}</option>
                           {rec.allScoredGuards && rec.allScoredGuards.length > 0 ? (
                             rec.allScoredGuards.map((sg: any, index: number) => {
                               const isRecommended = topGuard && sg.guardId === topGuard.guardId;
                               const pref = sg.shiftPreference || 'Flexible';
+                              const isIneligible = sg.isEligible === false;
                               return (
-                                <option key={sg.guardId} value={sg.guardId}>
-                                  #{index + 1} • {sg.guardName} ({pref}) [{sg.matchScore}% Match]{isRecommended ? ' (Recommended)' : ''}
+                                <option 
+                                  key={sg.guardId} 
+                                  value={sg.guardId}
+                                  disabled={isIneligible}
+                                  className={isIneligible ? 'text-red-400 bg-gray-50' : 'text-slate-900'}
+                                >
+                                  {isIneligible 
+                                    ? `[INELIGIBLE] ${sg.guardName} (${pref}) - ${sg.disqualificationReason || 'Restricted'}`
+                                    : `#${index + 1} • ${sg.guardName} (${pref}) [${sg.matchScore}% Match]${isRecommended ? ' (Recommended)' : ''}`
+                                  }
                                 </option>
                               );
                             })
@@ -2530,7 +2953,20 @@ function Schedules({ role }: { role?: string }) {
             </div>
             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
               <button type="button" onClick={() => setIsGeneratingSlots(false)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
-              <button type="submit" className="bg-[#1E3A5F] px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-[#162D4A] shadow-sm transition-colors">Generate Shift Slots</button>
+              <button
+                type="submit"
+                disabled={isSubmittingSlotGen}
+                className="bg-[#1E3A5F] px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-[#162D4A] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmittingSlotGen ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  'Generate Shift Slots'
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -2644,7 +3080,20 @@ function Schedules({ role }: { role?: string }) {
             </div>
             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
               <button type="button" onClick={() => setIsBatchAssigning(false)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
-              <button type="submit" className="bg-[#1E3A5F] px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-[#162D4A] shadow-sm transition-colors">Confirm Batch Assignment</button>
+              <button
+                type="submit"
+                disabled={isSubmittingBatchAssign}
+                className="bg-[#1E3A5F] px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-[#162D4A] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmittingBatchAssign ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Confirming...</span>
+                  </>
+                ) : (
+                  'Confirm Batch Assignment'
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -2677,7 +3126,7 @@ function Schedules({ role }: { role?: string }) {
 
                     return (
                       <>
-                        <optgroup label={`⭐ Recommended (${targetShiftType} / Flexible)`}>
+                        <optgroup label={`Recommended (${targetShiftType} / Flexible)`}>
                           {matching.map((g: any) => (
                             <option key={g.id} value={g.id}>
                               {g.firstName} {g.lastName} ({g.guardId}) • {g.shiftPreference || 'Flexible'}
@@ -2685,10 +3134,10 @@ function Schedules({ role }: { role?: string }) {
                           ))}
                         </optgroup>
                         {nonMatching.length > 0 && (
-                          <optgroup label="Other Guards">
+                          <optgroup label="Other Guards (Caution: Shift Preference Mismatch)">
                             {nonMatching.map((g: any) => (
                               <option key={g.id} value={g.id}>
-                                {g.firstName} {g.lastName} ({g.guardId}) • {g.shiftPreference}
+                                [Caution] {g.firstName} {g.lastName} ({g.guardId}) • Prefers {g.shiftPreference}
                               </option>
                             ))}
                           </optgroup>
@@ -2701,9 +3150,142 @@ function Schedules({ role }: { role?: string }) {
             </div>
             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
               <button type="button" onClick={() => setIsAssigning(null)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
-              <button type="submit" className="bg-emerald-600 px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors">Assign Guard</button>
+              <button
+                type="submit"
+                disabled={isSubmittingAssignGuard}
+                className="bg-emerald-600 px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmittingAssignGuard ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Assigning...</span>
+                  </>
+                ) : (
+                  'Assign Guard'
+                )}
+              </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Log Absence Modal */}
+      {isLoggingAbsence && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleConfirmAbsence} className="bg-white rounded-xl shadow-2xl w-[450px] overflow-hidden border border-gray-200">
+            <div className="px-6 py-4 border-b bg-amber-50 flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
+                  <UserX className="w-5 h-5 text-amber-700" />
+                  Log Guard Absence
+                </h3>
+                <p className="text-[12px] text-amber-800 mt-0.5">{isLoggingAbsence.shiftLabel} • {formatSiteName(isLoggingAbsence.site)}</p>
+              </div>
+              <button type="button" onClick={() => setIsLoggingAbsence(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-100/70 border border-amber-300 rounded-lg p-3 text-[13px] text-amber-900">
+                Logging an absence will change shift status to <strong className="font-bold">NEEDS REPLACEMENT</strong> and automatically open 1-click backup guard suggestions.
+              </div>
+              <div>
+                <label className="block text-[13px] font-semibold text-slate-700 mb-1">Absence Reason / Notes</label>
+                <textarea
+                  value={absenceReason}
+                  onChange={e => setAbsenceReason(e.target.value)}
+                  placeholder="e.g. Guard called in sick / Client requested replacement"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white min-h-[80px]"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsLoggingAbsence(null)} className="px-4 py-2 border rounded-lg text-[13px] font-medium text-gray-600 bg-white hover:bg-gray-100">Cancel</button>
+              <button type="submit" className="bg-amber-600 text-white font-semibold text-[13px] px-5 py-2 rounded-lg hover:bg-amber-700 transition-colors shadow-sm">Confirm Absence & Find Replacement</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 1-Click Replacement Suggestions Modal */}
+      {(replacementData || isLoadingReplacement) && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-[540px] overflow-hidden border border-gray-200">
+            <div className="px-6 py-4 border-b bg-[#1E3A5F] text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-amber-400" />
+                  1-Click Replacement Guard Finder
+                </h3>
+                <p className="text-[12px] text-slate-200 mt-0.5">
+                  {replacementData ? `${replacementData.siteName} (${replacementData.date}, ${replacementData.shiftTiming})` : 'Calculating optimal backup guards...'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setReplacementData(null)} className="text-slate-300 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[420px] overflow-y-auto space-y-3">
+              {isLoadingReplacement ? (
+                <div className="py-12 text-center text-slate-500 font-medium text-[14px]">
+                  Analyzing guard schedules, rest intervals, and shift preferences...
+                </div>
+              ) : replacementData?.suggestions?.length === 0 ? (
+                <div className="py-8 text-center text-amber-800 bg-amber-50 rounded-lg p-4 text-[13px] font-medium border border-amber-200">
+                  No active backup guards available for this time slot.
+                </div>
+              ) : (
+                replacementData?.suggestions?.map((cand: any, idx: number) => (
+                  <div key={cand.guardId} className="border border-slate-200 rounded-lg p-3.5 hover:border-[#1E3A5F] hover:bg-slate-50/60 transition-all flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[14px] text-slate-900">{cand.guardName}</span>
+                        <span className="text-[12px] font-semibold text-slate-500">({cand.guardCode})</span>
+                        {cand.isPreferenceMismatch ? (
+                          <span className="bg-amber-100 text-amber-900 border border-amber-300 font-semibold px-2 py-0.5 rounded text-[11px]">
+                            Caution: {cand.shiftPreference} Guard
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold px-2 py-0.5 rounded text-[11px]">
+                            Matches {cand.shiftPreference} Pref
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[12px] text-slate-500 mt-1">
+                        Agency: <strong className="text-slate-700">{cand.agencyName}</strong> • Match Score: <strong className="text-emerald-700">{cand.matchScore}%</strong>
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {cand.rationale?.map((r: string, rIdx: number) => (
+                          <span key={rIdx} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await assignGuard(replacementData.targetRoster.id, cand.guardId);
+                          setReplacementData(null);
+                          loadSchedules();
+                        } catch (err: any) {
+                          alert(err.message || 'Failed to assign replacement guard');
+                        }
+                      }}
+                      className="bg-emerald-600 text-white text-[12px] font-bold px-3.5 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-xs flex-shrink-0"
+                    >
+                      {idx === 0 ? 'Assign Top Backup' : 'Assign'}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-6 py-3.5 border-t bg-slate-50 flex justify-end">
+              <button type="button" onClick={() => setReplacementData(null)} className="px-4 py-2 border rounded-lg text-[13px] font-semibold text-slate-700 bg-white hover:bg-slate-100">
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -2863,8 +3445,9 @@ function Logs({ role }: { role?: string }) {
                     </td>
                     <td className="px-6 py-4 text-[12px] text-gray-500 font-mono">
                       {typeof item.latitude === 'number' && typeof item.longitude === 'number' ? (
-                        <a href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                          📍 {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
+                        <a href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 font-mono">
+                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                          {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
                         </a>
                       ) : (
                         <span className="text-gray-400">Site Mobile Check-in</span>
@@ -2973,8 +3556,17 @@ function Reports({ role }: { role?: string }) {
   const [guards, setGuards] = useState<any[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+
+  // Default date filter to Current Month start and end to prevent system lag
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+  });
+
   const [agencyFilter, setAgencyFilter] = useState('All');
   const [siteFilter, setSiteFilter] = useState('All Sites');
 
@@ -2983,13 +3575,38 @@ function Reports({ role }: { role?: string }) {
     return `${g.firstName || ''} ${g.lastName || ''}`.trim() || 'Unknown Guard';
   };
 
+  const [contractSites, setContractSites] = useState<any[]>([]);
+
   useEffect(() => {
+    fetchContracts().then(setContractSites).catch(console.error);
     fetchReportsOverview().then(setStats).catch(console.error);
   }, []);
 
   useEffect(() => {
     fetchGuardPerformance(dateFrom, dateTo, siteFilter).then(setGuards).catch(console.error);
   }, [dateFrom, dateTo, siteFilter]);
+
+  const allSiteOptions = useMemo(() => {
+    const siteNamesSet = new Set<string>();
+    
+    // 1. Add from contract sites list
+    (contractSites || []).forEach((c: any) => {
+      const name = c.siteName || c.locationName || c.name;
+      if (name) siteNamesSet.add(name);
+    });
+
+    // 2. Add from siteAttendanceData stats
+    (stats?.siteAttendanceData || []).forEach((s: any) => {
+      if (s.site) siteNamesSet.add(s.site);
+    });
+
+    // 3. Add from incidentFrequency stats
+    Object.keys(stats?.incidentFrequency || {}).forEach((s: string) => {
+      if (s) siteNamesSet.add(s);
+    });
+
+    return Array.from(siteNamesSet).sort();
+  }, [contractSites, stats]);
 
   const chartData = useMemo(() => {
     if (!stats?.incidentFrequency) return [];
@@ -3002,10 +3619,8 @@ function Reports({ role }: { role?: string }) {
   const filteredGuards = useMemo(() => {
     return guards.filter(g => {
       const gName = (g.firstName + ' ' + g.lastName).toLowerCase();
-      const agencyName = (g.agency?.name || 'In-House').toLowerCase();
       const matchesSearch = gName.includes(searchQuery.toLowerCase()) || g.guardId.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesAgency = agencyFilter === 'All' || g.agency?.name === agencyFilter;
-      // Note: time/date mapping in simple guard objects isn't directly present without rosters, we simulate filtering visually
       return matchesSearch && matchesAgency;
     });
   }, [guards, searchQuery, agencyFilter]);
@@ -3013,17 +3628,87 @@ function Reports({ role }: { role?: string }) {
   const uniqueAgencies = Array.from(new Set(guards.map(g => g.agency?.name).filter(Boolean)));
 
   const exportReport = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredGuards.map(g => ({
+    // 1. Guard Performance Sheet
+    const ws1 = XLSX.utils.json_to_sheet(filteredGuards.map(g => ({
       'Guard ID': role === 'CLIENT' ? 'HIDDEN' : g.guardId,
-      'Name': formatGuardName(g),
-      'Agency': g.agency?.name || 'In-House',
-      'Status': g.status,
-      'Incident Count': g.incidentCount,
-      'Utilization %': g.utilization
+      'Guard Name': formatGuardName(g),
+      'Vendor / Agency': g.agency?.name || 'In-House Personnel',
+      'Shift Preference': g.shiftPreference || 'Flexible',
+      'Assigned Contracts': g.assignedContracts || 0,
+      'Total Assigned Hours': g.totalAssignedHours || 0,
+      'Actual Worked Hours': g.workedHours || 0,
+      'Attendance Rate (%)': `${g.attendanceRate || 0}%`,
+      'Minor Lates (1-15m)': g.minorLateCount || 0,
+      'Moderate Lates (16-45m)': g.moderateLateCount || 0,
+      'Severe Lates (>45m)': g.severeLateCount || 0,
+      'Total Absences': g.absenceCount || 0,
+      'Guard Status': g.status || 'Active'
     })));
+
+    ws1['!cols'] = [
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 14 },
+    ];
+
+    // 2. Executive Operational KPI Summary Sheet
+    const kpiSummary = [
+      { Metric: 'Report Date Range', Value: `${dateFrom} to ${dateTo}` },
+      { Metric: 'Site Filter Scope', Value: siteFilter },
+      { Metric: 'Agency Filter Scope', Value: agencyFilter },
+      { Metric: 'User Role Context', Value: role || 'OPERATION_MANAGER' },
+      { Metric: 'Total Guards Deployed / On Duty', Value: stats?.guardsOnDuty || 0 },
+      { Metric: 'Total System Guards Count', Value: stats?.totalGuardsCount || 0 },
+      { Metric: 'Active Managed Contracts', Value: stats?.activeContracts || 0 },
+      { Metric: 'Pending Security Alerts', Value: stats?.pendingAlerts || 0 },
+      { Metric: 'SLA Contract Fulfillment Rate', Value: `${stats?.contractFulfillment || 0}%` },
+      { Metric: 'On-Time Arrival Compliance Rate', Value: `${stats?.punctualitySummary?.onTimeRate ?? 100}%` },
+      { Metric: 'Overall Guard Attendance Rate', Value: `${stats?.attendanceRate || 0}%` },
+    ];
+    const ws2 = XLSX.utils.json_to_sheet(kpiSummary);
+    ws2['!cols'] = [{ wch: 35 }, { wch: 30 }];
+
+    // 3. Site Attendance Breakdown Sheet
+    const siteBreakdown = (stats?.siteAttendanceData || []).map((s: any) => {
+      const totalShifts = (s.onTime || 0) + (s.late || 0) + (s.absent || 0);
+      const complianceRate = totalShifts > 0 ? Math.round(((s.onTime || 0) / totalShifts) * 100) : 100;
+      return {
+        'Contract Site Name': s.site,
+        'On-Time Shifts': s.onTime || 0,
+        'Late Arrivals': s.late || 0,
+        'Uncovered Absences': s.absent || 0,
+        'Total Shifts Scheduled': totalShifts,
+        'Site Compliance Rate (%)': `${complianceRate}%`
+      };
+    });
+    const ws3 = XLSX.utils.json_to_sheet(siteBreakdown.length > 0 ? siteBreakdown : [{ 'Status': 'No site attendance logs found' }]);
+    ws3['!cols'] = [
+      { wch: 32 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 24 }
+    ];
+
+    // Build Workbook
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Guard_Performance");
-    XLSX.writeFile(wb, "SPMS_Performance_Report.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws1, "Guard_Performance");
+    XLSX.utils.book_append_sheet(wb, ws2, "Executive_KPI_Summary");
+    XLSX.utils.book_append_sheet(wb, ws3, "Site_Punctuality");
+
+    const fileName = `SPMS_Performance_Report_${dateFrom}_to_${dateTo}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   return (
@@ -3031,7 +3716,7 @@ function Reports({ role }: { role?: string }) {
       <div className="flex justify-between items-start gap-8">
         <div className="flex-shrink-0">
           <h2 className="text-[24px] font-bold text-[#1E3A5F]">Performance Analytics</h2>
-          <p className="text-[14px] text-[#6B7280] mt-1">Live metrics, incident frequency, and guard duty evaluations.</p>
+          <p className="text-[14px] text-[#6B7280] mt-1">Live metrics, attendance rates, shift hours, and tiered late penalties.</p>
         </div>
         <div className="flex flex-1 gap-2 items-center flex-wrap justify-end">
           <input
@@ -3041,11 +3726,11 @@ function Reports({ role }: { role?: string }) {
             onChange={e => setSearchQuery(e.target.value)}
             className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] outline-none focus:border-[#1E3A5F] flex-1 max-w-[600px]"
           />
-          <div className="flex gap-1 items-center bg-gray-50 border rounded px-2">
-            <span className="text-[11px] text-gray-500 font-medium">Dates:</span>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent border-none outline-none text-[12px] p-1 text-gray-700 w-[105px]"/>
-            <span className="text-gray-400 text-[10px]">to</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent border-none outline-none text-[12px] p-1 text-gray-700 w-[105px]"/>
+          <div className="flex gap-1 items-center bg-white border border-[#E2E8F0] rounded px-2 py-1 shadow-2xs">
+            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Month:</span>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent border-none outline-none text-[12px] p-0.5 text-gray-700 w-[110px] font-medium"/>
+            <span className="text-gray-400 text-[11px]">to</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent border-none outline-none text-[12px] p-0.5 text-gray-700 w-[110px] font-medium"/>
           </div>
           <select
             value={siteFilter}
@@ -3053,7 +3738,7 @@ function Reports({ role }: { role?: string }) {
             className="border border-[#E2E8F0] rounded px-3 py-1.5 text-[13px] text-gray-600 outline-none focus:border-[#1E3A5F]"
           >
             <option value="All Sites">All Sites</option>
-            {Object.keys(stats?.incidentFrequency || {}).map(s => <option key={s} value={s}>{s}</option>)}
+            {allSiteOptions.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select
             value={agencyFilter}
@@ -3063,7 +3748,7 @@ function Reports({ role }: { role?: string }) {
             <option value="All">All Agencies</option>
             {uniqueAgencies.map((a: any) => <option key={a} value={a}>{a}</option>)}
           </select>
-          <button onClick={exportReport} className="flex items-center gap-2 bg-[#1E3A5F] px-4 py-2 text-[13px] text-white font-medium rounded hover:bg-[#162D4A] transition-colors">
+          <button onClick={exportReport} className="flex items-center gap-2 bg-[#1E3A5F] px-4 py-2 text-[13px] text-white font-medium rounded hover:bg-[#162D4A] transition-colors shadow-sm">
             <Download className="w-4 h-4" /> Export XLSX
           </button>
         </div>
@@ -3163,48 +3848,77 @@ function Reports({ role }: { role?: string }) {
       </div>
 
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm">
-        <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
-          <h3 className="text-[14px] font-bold text-[#1E3A5F]">Guard Performance Log</h3>
+        <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC] flex justify-between items-center">
+          <div>
+            <h3 className="text-[14px] font-bold text-[#1E3A5F]">Guard Performance Log & Contract Analytics</h3>
+            <p className="text-[12px] text-gray-500 mt-0.5">Current month breakdown of assigned contracts, worked hours, punctuality penalties, and attendance.</p>
+          </div>
+          <span className="text-[11px] bg-slate-100 text-slate-700 font-semibold px-2.5 py-1 rounded border border-slate-200">Current Month Filter Active</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white border-b border-[#E2E8F0]">
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase">Guard</th>
-                {role === 'OPERATION_MANAGER' && <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase">Affiliation</th>}
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase">Status</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase text-center">Lifetime Incidents</th>
-                <th className="px-6 py-3 text-[12px] font-semibold text-[#6B7280] uppercase text-right">Duty Utilization</th>
+                <th className="px-5 py-3.5 text-[11px] font-bold text-[#475569] uppercase">Guard Name &amp; ID</th>
+                <th className="px-4 py-3.5 text-[11px] font-bold text-[#475569] uppercase">Preference</th>
+                <th className="px-4 py-3.5 text-[11px] font-bold text-[#475569] uppercase text-center">Assigned Contracts</th>
+                <th className="px-4 py-3.5 text-[11px] font-bold text-[#475569] uppercase text-center">Assigned vs Worked Hours</th>
+                <th className="px-4 py-3.5 text-[11px] font-bold text-[#475569] uppercase text-center">Attendance %</th>
+                <th className="px-4 py-3.5 text-[11px] font-bold text-[#475569] uppercase text-center">Late Penalties (Minor / Mod / Sev)</th>
+                <th className="px-4 py-3.5 text-[11px] font-bold text-[#475569] uppercase text-center">Absences</th>
               </tr>
             </thead>
             <tbody>
               {filteredGuards.map(g => (
-                <tr key={g.id} className="hover:bg-gray-50 border-b border-gray-100 last:border-0">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-[13px] text-[#0F172A]">{formatGuardName(g)}</p>
-                    <p className="text-[11px] text-gray-400">ID: {role === 'CLIENT' ? 'HIDDEN' : g.guardId}</p>
+                <tr key={g.id} className="hover:bg-slate-50/70 border-b border-gray-100 last:border-0 text-[13px]">
+                  <td className="px-5 py-3.5">
+                    <p className="font-bold text-[#0F172A]">{formatGuardName(g)}</p>
+                    <p className="text-[11px] text-slate-500">
+                      ID: {role === 'CLIENT' ? 'HIDDEN' : g.guardId} {g.agency?.name ? `• ${g.agency.name}` : ''}
+                    </p>
                   </td>
-                  {role === 'OPERATION_MANAGER' && (
-                    <td className="px-6 py-4 text-[13px] text-gray-600">
-                      {g.agency?.name || 'In-House'}
-                    </td>
-                  )}
-                  <td className="px-6 py-4">
-                    <span className={`text-[12px] px-2 py-0.5 rounded-full font-medium ${g.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {g.status}
+                  <td className="px-4 py-3.5 text-[#334155] font-medium">
+                    <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-[12px] font-semibold border border-slate-200">
+                      {g.shiftPreference || 'Flexible'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center text-[13px] font-medium text-[#1E3A5F]">
-                    {g.incidentCount}
+                  <td className="px-4 py-3.5 text-center font-bold text-[#1E3A5F]">
+                    {g.assignedContracts || 0}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-[13px] font-medium text-gray-700">{g.utilization}%</span>
+                  <td className="px-4 py-3.5 text-center">
+                    <span className="font-bold text-slate-900">{g.workedHours || 0}h</span>
+                    <span className="text-[11px] text-slate-400 font-medium ml-1">/ {g.totalAssignedHours || 0}h assigned</span>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <span className={`font-bold px-2.5 py-0.5 rounded-full text-[12px] ${g.attendanceRate >= 90 ? 'bg-emerald-100 text-emerald-800' : g.attendanceRate >= 75 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {g.attendanceRate || 0}%
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {(g.minorLateCount || 0) + (g.moderateLateCount || 0) + (g.severeLateCount || 0) === 0 ? (
+                      <span className="text-emerald-700 font-medium">0 (Perfect)</span>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold">
+                        <span className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded border border-slate-200" title="Minor (1-15m)">{g.minorLateCount || 0}m</span>
+                        <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300" title="Moderate (16-45m)">{g.moderateLateCount || 0}M</span>
+                        <span className="bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded border border-rose-300" title="Severe (>45m)">{g.severeLateCount || 0}S</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 text-center font-bold">
+                    {g.absenceCount > 0 ? (
+                      <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[12px]">
+                        {g.absenceCount}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">0</span>
+                    )}
                   </td>
                 </tr>
               ))}
               {filteredGuards.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[13px] text-gray-400">No matching guard performance data.</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-[13px] text-gray-400 font-medium">No matching guard performance logs found for this current month filter.</td>
                 </tr>
               )}
             </tbody>

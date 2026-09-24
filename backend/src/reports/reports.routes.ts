@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
 // Middleware to extract user from JWT
@@ -148,8 +147,14 @@ router.get('/guards', async (req: any, res) => {
     if (user?.role === 'CLIENT') filter.rosters = { some: { site: { contract: { clientId: user.userId } } } };
 
     const { startDate, endDate, siteId } = req.query;
-    const startObj = startDate ? new Date(String(startDate)) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const endObj = endDate ? new Date(String(endDate)) : new Date();
+
+    // Default to Current Month start and end if not explicitly specified to prevent system lag
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const startObj = startDate ? new Date(String(startDate)) : currentMonthStart;
+    const endObj = endDate ? new Date(String(endDate)) : currentMonthEnd;
 
     const rosterWhere: any = { date: { gte: startObj, lte: endObj } };
     if (siteId) rosterWhere.siteId = String(siteId);
@@ -161,7 +166,7 @@ router.get('/guards', async (req: any, res) => {
         rosters: {
           where: rosterWhere,
           include: { 
-            site: true,
+            site: { include: { contract: true } },
             arrivals: true,
             exceptions: true
           }
@@ -176,49 +181,69 @@ router.get('/guards', async (req: any, res) => {
       const totalAssigned = g.rosters.length;
       const completedShifts = g.rosters.filter((r: any) => r.status.startsWith('Completed')).length;
 
-      // Calculate actual hours from shift timings on completed rosters
-      let actualHours = 0;
-      g.rosters.filter((r: any) => r.status.startsWith('Completed')).forEach((r: any) => {
-        const [sh, sm] = r.startTime.split(':').map(Number);
-        const [eh, em] = r.endTime.split(':').map(Number);
+      let totalAssignedHours = 0;
+      let lateDeductionMinutes = 0;
+
+      g.rosters.forEach((r: any) => {
+        const [sh, sm] = (r.startTime || '08:00').split(':').map(Number);
+        const [eh, em] = (r.endTime || '20:00').split(':').map(Number);
         let diff = (eh * 60 + em) - (sh * 60 + sm);
         if (diff <= 0) diff += 24 * 60; // overnight shift
-        actualHours += diff / 60;
+        totalAssignedHours += diff / 60;
       });
-      actualHours = Math.round(actualHours * 10) / 10;
 
-      // Attendance via ArrivalLog
+      // Tiered Late Penalties & Arrival Tracking
       let arrivedCount = 0;
       let onTimeCount = 0;
-      let lateCount = 0;
+      let minorLateCount = 0;    // 1 - 15 mins
+      let moderateLateCount = 0; // 16 - 45 mins
+      let severeLateCount = 0;   // > 45 mins
 
       g.rosters.forEach((r: any) => {
         if (r.arrivals && r.arrivals.length > 0) {
           arrivedCount++;
           const arrival = r.arrivals[0];
-          // Compare arrival timestamp to shift start time (10-min threshold)
           if (r.date) {
             const shiftDate = new Date(r.date);
-            const [hrs, mins] = r.startTime.split(':').map(Number);
+            const [hrs, mins] = (r.startTime || '08:00').split(':').map(Number);
             const shiftStart = new Date(shiftDate);
             shiftStart.setHours(hrs, mins, 0, 0);
-            const graceDeadline = new Date(shiftStart.getTime() + 10 * 60 * 1000); // 10 min grace
-            if (new Date(arrival.timestamp) <= graceDeadline) {
+
+            const diffMs = new Date(arrival.timestamp).getTime() - shiftStart.getTime();
+            const diffMins = Math.floor(diffMs / (60 * 1000));
+
+            if (diffMins <= 10) {
               onTimeCount++;
             } else {
-              lateCount++;
+              lateDeductionMinutes += Math.max(0, diffMins);
+              if (diffMins <= 15) {
+                minorLateCount++;
+              } else if (diffMins <= 45) {
+                moderateLateCount++;
+              } else {
+                severeLateCount++;
+              }
             }
           } else {
-            onTimeCount++; // Can't compare without date, assume on-time
+            onTimeCount++;
           }
         }
       });
 
-      const attendanceRate = totalAssigned > 0 ? Math.round((arrivedCount / totalAssigned) * 100) : 0;
+      const totalLateCount = minorLateCount + moderateLateCount + severeLateCount;
       const exceptionCount = g.rosters.reduce((sum: number, r: any) => sum + (r.exceptions?.length || 0), 0);
-      const noShowCount = totalAssigned - arrivedCount - exceptionCount;
+      const noShowCount = Math.max(0, totalAssigned - arrivedCount - exceptionCount);
+      const absenceCount = exceptionCount + noShowCount;
 
-      // Distinct sites covered
+      // Calculate Worked Hours = Completed Shift Hours - Late Deductions - Absence Hours
+      let workedHours = Math.max(0, totalAssignedHours - (noShowCount * 12) - (lateDeductionMinutes / 60));
+      workedHours = Math.round(workedHours * 10) / 10;
+      totalAssignedHours = Math.round(totalAssignedHours * 10) / 10;
+
+      const attendanceRate = totalAssigned > 0 ? Math.round(((arrivedCount) / totalAssigned) * 100) : 0;
+
+      // Distinct contracts and sites covered
+      const assignedContracts = [...new Set(g.rosters.map((r: any) => r.site?.contract?.clientCompanyName || r.site?.name).filter(Boolean))].length;
       const siteNames = [...new Set(g.rosters.map((r: any) => r.site?.name).filter(Boolean))];
       const avgIncidentsPerShift = completedShifts > 0 ? Math.round((g.checkIns.length / completedShifts) * 100) / 100 : 0;
 
@@ -229,16 +254,23 @@ router.get('/guards', async (req: any, res) => {
         lastName: g.lastName,
         source: g.source,
         status: g.status,
+        shiftPreference: g.shiftPreference || 'Flexible',
         agency: g.agency,
-        // Enriched metrics
+        // Enriched performance metrics
+        assignedContracts,
         totalAssigned,
         completedShifts,
+        totalAssignedHours,
+        workedHours,
         attendanceRate,
         onTimeCount,
-        lateCount,
-        noShowCount: Math.max(0, noShowCount),
+        lateCount: totalLateCount,
+        minorLateCount,
+        moderateLateCount,
+        severeLateCount,
+        noShowCount,
         exceptionCount,
-        actualHours,
+        absenceCount,
         sitesCovered: siteNames.join(', '),
         incidentCount: g.checkIns.length,
         avgIncidentsPerShift

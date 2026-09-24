@@ -15,6 +15,7 @@ export default function GuardShifts() {
   }, []);
 
   const handleCheckin = async (rosterId: string, mapPinId: string) => {
+    if (loading) return;
     setLoading(true);
     try {
       await checkinShiftPin(rosterId, mapPinId, 'Routine check-in');
@@ -22,11 +23,13 @@ export default function GuardShifts() {
       loadShifts();
     } catch (e) {
       toast.error('Failed to check in checkpoint.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleArrive = async (rosterId: string) => {
+    if (loading) return;
     setLoading(true);
     try {
       await arriveAtShift(rosterId);
@@ -34,8 +37,9 @@ export default function GuardShifts() {
       loadShifts();
     } catch (e: any) {
       toast.error(e.message || 'Failed to mark arrival.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const getNavUrl = (site: any) => {

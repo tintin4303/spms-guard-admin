@@ -27,7 +27,7 @@ export default function GuardIncidents() {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    if (!rosterId || !description) return;
+    if (loading || !rosterId || !description) return;
     setLoading(true);
     try {
       const fullDesc = locationDescription 
@@ -40,8 +40,9 @@ export default function GuardIncidents() {
       setMapPinId('');
     } catch (err) {
       toast.error('Failed to submit incident report.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
