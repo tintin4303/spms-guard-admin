@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import maplibregl from 'maplibre-gl';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapPin, X } from 'lucide-react';
+
+// Fix for Vite production worker path issue causing black maps
+maplibregl.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
 
 interface LocationPickerProps {
   initialLat?: number | null;
