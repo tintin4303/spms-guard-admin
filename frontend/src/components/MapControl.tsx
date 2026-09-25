@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import Map, { Source, Layer, Marker, NavigationControl } from 'react-map-gl/maplibre';
 import { savePatrolPath, fetchPatrolPaths, updatePatrolPath, deletePatrolPath, fetchContracts } from '../api';
 
 // Fix for Vite production worker path issue causing black maps
-maplibregl.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
+// Bypass Rolldown's strict immutable import checks
+const maplibreglAny = maplibregl as any;
+maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
 
 interface Pin {
   lat?: number;
