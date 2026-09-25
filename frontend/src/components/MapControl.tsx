@@ -446,6 +446,7 @@ export default function MapControl({ user }: { user?: any }) {
 
           <Map
             ref={mapRef}
+            mapLib={maplibregl}
             {...viewState}
             onMove={evt => setViewState(evt.viewState)}
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
