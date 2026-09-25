@@ -8,23 +8,23 @@ import { MapPin, X } from 'lucide-react';
 const maplibreglAny = maplibregl as any;
 maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
 
-const darkRasterStyle = {
+const osmRasterStyle = {
   version: 8,
   sources: {
-    'carto-dark': {
+    'osm': {
       type: 'raster',
-      tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
-      attribution: '&copy; CARTO, &copy; OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap contributors'
     }
   },
   layers: [
     {
-      id: 'carto-dark-layer',
+      id: 'osm-layer',
       type: 'raster',
-      source: 'carto-dark',
+      source: 'osm',
       minzoom: 0,
-      maxzoom: 20
+      maxzoom: 19
     }
   ]
 };
@@ -157,8 +157,8 @@ export default function SiteLocationPicker({ initialLat, initialLng, onSelectLoc
             mapLib={maplibregl}
             {...viewState}
             onMove={(evt) => setViewState(evt.viewState)}
-            mapStyle={darkRasterStyle as any}
-            style={{ width: '100%', height: '100%' }}
+            mapStyle={osmRasterStyle as any}
+            style={{ width: '100%', height: '100%', filter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
             onClick={handleMapClick}
           >
             <NavigationControl position="bottom-right" />
