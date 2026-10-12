@@ -1,6 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import jwt from 'jsonwebtoken';
+import { unpackSkills } from '../guards/guards.routes';
+
+export function getSiteRequiredGender(guardQualifications?: string | null): 'Female' | 'Male' | null {
+  if (!guardQualifications) return null;
+  const lower = guardQualifications.toLowerCase();
+  if (lower.includes('female only') || lower.includes('gender: female') || lower.includes('female guard')) {
+    return 'Female';
+  }
+  if (lower.includes('male only') || lower.includes('gender: male') || lower.includes('male guard')) {
+    return 'Male';
+  }
+  return null;
+}
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
@@ -71,7 +84,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       endTime: r.endTime,
       shiftLabel: r.shiftLabel || `${r.date ? r.date.toISOString().split('T')[0] : 'N/A'}, ${r.startTime} - ${r.endTime}`,
       guardId: r.guardId,
-      guard: r.guard || null,
+      guard: r.guard ? { ...r.guard, ...unpackSkills(r.guard.skills) } : null,
       siteId: r.siteId || r.site?.id,
       site: r.site,
       patrolPathId: r.patrolPathId,
@@ -312,6 +325,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
         const gId = String(g.id);
         const key = `${gId}_${dateIso}`;
         const alreadyWorking = guardDailyAssignments[key];
+        const { gender: guardGender } = unpackSkills(g.skills);
 
         let score = 0;
         const rationale: string[] = [];
@@ -325,7 +339,20 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           rationale.push('Disqualified: Max 1 Shift/Day Reached');
         }
 
-        // 2. Strict Shift Preference Match (HARD RESTRICTION FOR PREFERENCE CONFLICTS)
+        // 2. Site Gender Requirement Check (HARD RESTRICTION)
+        const requiredGender = getSiteRequiredGender(r.site?.guardQualifications);
+        if (requiredGender) {
+          if (guardGender !== requiredGender) {
+            isEligible = false;
+            disqualificationReason = `Ineligible: Site strictly requires ${requiredGender} guard (Guard is ${guardGender})`;
+            rationale.push(`Disqualified: Site requires ${requiredGender} guard`);
+          } else {
+            score += 25;
+            rationale.push(`Gender Requirement Match (${requiredGender})`);
+          }
+        }
+
+        // 3. Strict Shift Preference Match (HARD RESTRICTION FOR PREFERENCE CONFLICTS)
         const pref = (g.shiftPreference || 'Flexible').toLowerCase();
         let isPrefMismatch = false;
 
@@ -347,7 +374,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           rationale.push('Flexible Availability');
         }
 
-        // 3. Rest Interval Protection (HARD RESTRICTION FOR CONSECUTIVE NIGHT/DAY SHIFTS)
+        // 4. Rest Interval Protection (HARD RESTRICTION FOR CONSECUTIVE NIGHT/DAY SHIFTS)
         if (r.date) {
           const prevDay = new Date(r.date);
           prevDay.setDate(prevDay.getDate() - 1);
@@ -369,7 +396,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           score += 15;
         }
 
-        // 4. Workload Balancing (+30 pts max)
+        // 5. Workload Balancing (+30 pts max)
         const currentCount = guardSimulatedShifts[gId] || 0;
         if (currentCount === 0) {
           score += 30;
@@ -384,7 +411,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           score += 10;
         }
 
-        // 5. Base Continuity
+        // 6. Base Continuity
         score += 10;
 
         scoredGuards.push({
@@ -392,6 +419,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           guardName: `${g.firstName} ${g.lastName}`.trim() || g.guardId,
           guardCode: g.guardId,
           agencyName: g.agency?.name || 'Direct Guard',
+          gender: guardGender,
           shiftPreference: g.shiftPreference || 'Flexible',
           isPreferenceMismatch: isPrefMismatch,
           isEligible,
@@ -611,11 +639,25 @@ router.get('/replacement-suggestions/:rosterId', async (req: Request, res: Respo
       include: { agency: true }
     });
 
+    const requiredGender = getSiteRequiredGender(roster.site?.guardQualifications);
+
     const suggestions = availableGuards.map((g: any) => {
+      const { gender: guardGender } = unpackSkills(g.skills);
       let score = 0;
       const rationale: string[] = [];
       const pref = (g.shiftPreference || 'Flexible').toLowerCase();
       let isPrefMismatch = false;
+
+      let isGenderMismatch = false;
+      if (requiredGender) {
+        if (guardGender !== requiredGender) {
+          isGenderMismatch = true;
+          rationale.push(`Gender Warning: Site requires ${requiredGender} guard (Guard is ${guardGender})`);
+        } else {
+          score += 25;
+          rationale.push(`Matches Site Required Gender (${requiredGender})`);
+        }
+      }
 
       if ((pref.includes('day') && !isNightShift) || (pref.includes('night') && isNightShift)) {
         score += 40;
@@ -637,9 +679,11 @@ router.get('/replacement-suggestions/:rosterId', async (req: Request, res: Respo
         guardCode: g.guardId,
         guardName: `${g.firstName} ${g.lastName}`.trim(),
         agencyName: g.agency?.name || 'In-House',
+        gender: guardGender,
         shiftPreference: g.shiftPreference || 'Flexible',
         isPreferenceMismatch: isPrefMismatch,
-        matchScore: Math.min(100, score),
+        isGenderMismatch,
+        matchScore: isGenderMismatch ? Math.max(10, Math.min(100, score - 30)) : Math.min(100, score),
         rationale
       };
     });

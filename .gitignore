@@ -48,3 +48,7 @@ next-env.d.ts
 
 # AI Documents
 .ai/
+
+# Archived Artifacts & Gemini
+.gemini/
+archive/

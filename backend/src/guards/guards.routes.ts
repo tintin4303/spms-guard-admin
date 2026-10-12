@@ -6,6 +6,51 @@ import bcrypt from 'bcrypt';
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
 
+export function unpackSkills(skillsRaw: any) {
+  let gender = 'Not Specified';
+  let skills: string[] = [];
+
+  if (skillsRaw) {
+    let parsed = skillsRaw;
+    if (typeof skillsRaw === 'string') {
+      try { parsed = JSON.parse(skillsRaw); } catch { parsed = []; }
+    }
+
+    if (Array.isArray(parsed)) {
+      skills = parsed;
+      const genderTag = parsed.find((s: string) => typeof s === 'string' && s.startsWith('Gender: '));
+      if (genderTag) {
+        gender = genderTag.replace('Gender: ', '').trim();
+        skills = parsed.filter((s: string) => s !== genderTag);
+      }
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      gender = parsed.gender || 'Not Specified';
+      skills = Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed.skills) ? parsed.skills : []);
+    }
+  }
+
+  return { gender, skills };
+}
+
+export function packSkills(gender?: string, skills?: any) {
+  const g = gender && typeof gender === 'string' && gender.trim() ? gender.trim() : 'Not Specified';
+  let sList: string[] = [];
+  if (Array.isArray(skills)) {
+    sList = skills;
+  } else if (typeof skills === 'string') {
+    try {
+      const p = JSON.parse(skills);
+      sList = Array.isArray(p) ? p : [skills];
+    } catch {
+      sList = skills ? [skills] : [];
+    }
+  }
+  return {
+    gender: g,
+    items: sList
+  };
+}
+
 router.get('/', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -31,8 +76,6 @@ router.get('/', async (req, res) => {
       };
     }
 
-    // When returning to client, strip sensitive info, but here we can just query all and pick what we send back or leave stripping to the frontend (though backend stripping is safer).
-    // Let's strip in the response map if CLIENT.
     const guards = await prisma.guard.findMany({
       where,
       include: { agency: { select: { name: true } }, user: { select: { id: true, email: true } } },
@@ -40,17 +83,30 @@ router.get('/', async (req, res) => {
     });
 
     if (user?.role === 'CLIENT') {
-      const strippedGuards = guards.map(g => ({
-        id: g.id,
-        guardId: g.guardId,
-        firstName: g.firstName,
-        lastName: g.lastName ? g.lastName.charAt(0) + '.' : '',
-        status: g.status,
-      }));
+      const strippedGuards = guards.map(g => {
+        const { gender } = unpackSkills(g.skills);
+        return {
+          id: g.id,
+          guardId: g.guardId,
+          firstName: g.firstName,
+          lastName: g.lastName ? g.lastName.charAt(0) + '.' : '',
+          status: g.status,
+          gender
+        };
+      });
       return res.json(strippedGuards);
     }
 
-    res.json(guards);
+    const mappedGuards = guards.map(g => {
+      const { gender, skills } = unpackSkills(g.skills);
+      return {
+        ...g,
+        gender,
+        skills
+      };
+    });
+
+    res.json(mappedGuards);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch guards' });
   }
@@ -64,7 +120,7 @@ router.post('/', async (req, res) => {
       try { user = jwt.verify(token, JWT_SECRET); } catch (e) { }
     }
 
-    const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills } = req.body;
+    const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills, gender } = req.body;
     
     let source = "IN_HOUSE";
     let agencyId = null;
@@ -84,12 +140,18 @@ router.post('/', async (req, res) => {
         status: status || 'Active',
         contactNumber,
         certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : undefined,
-        skills: skills ? JSON.stringify(skills) : undefined,
+        skills: packSkills(gender, skills),
         source,
         agencyId
       }
     });
-    res.json(guard);
+
+    const unpacked = unpackSkills(guard.skills);
+    res.json({
+      ...guard,
+      gender: unpacked.gender,
+      skills: unpacked.skills
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create guard' });
   }
@@ -98,24 +160,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills } = req.body;
-
-    // If status is changed to "On Leave", we need to flag upcoming assignments for reassignment
-    // NOTE: GuardAssignment doesn't exist in the current schema. You'd need to log a ShiftException.
-    /*
-    if (status === 'On Leave') {
-       await prisma.guardAssignment.updateMany({
-         where: {
-           guardId: id,
-           status: 'Scheduled',
-           date: { gte: new Date() } // future assignments
-         },
-         data: {
-           status: 'Pending Reassignment'
-         }
-       });
-    }
-    */
+    const { firstName, lastName, guardId, certificateNumber, shiftPreference, status, contactNumber, certificationExpiry, skills, gender } = req.body;
 
     const updated = await prisma.guard.update({
       where: { id },
@@ -128,10 +173,16 @@ router.put('/:id', async (req, res) => {
         status,
         contactNumber,
         certificationExpiry: certificationExpiry ? new Date(certificationExpiry) : undefined,
-        skills: skills ? JSON.stringify(skills) : undefined
+        skills: packSkills(gender, skills)
       }
     });
-    res.json(updated);
+
+    const unpacked = unpackSkills(updated.skills);
+    res.json({
+      ...updated,
+      gender: unpacked.gender,
+      skills: unpacked.skills
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update guard' });
