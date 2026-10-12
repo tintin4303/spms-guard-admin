@@ -8,33 +8,21 @@ import { MapPin, X } from 'lucide-react';
 const maplibreglAny = maplibregl as any;
 maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
 
-const darkEnglishRasterStyle = {
+const osmRasterStyle = {
   version: 8,
   sources: {
-    'esri-dark-base': {
+    'osm': {
       type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
-      attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
-    },
-    'esri-dark-labels': {
-      type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256
+      attribution: '&copy; OpenStreetMap contributors'
     }
   },
   layers: [
     {
-      id: 'esri-base-layer',
+      id: 'osm-layer',
       type: 'raster',
-      source: 'esri-dark-base',
-      minzoom: 0,
-      maxzoom: 19
-    },
-    {
-      id: 'esri-label-layer',
-      type: 'raster',
-      source: 'esri-dark-labels',
+      source: 'osm',
       minzoom: 0,
       maxzoom: 19
     }
@@ -169,8 +157,8 @@ export default function SiteLocationPicker({ initialLat, initialLng, onSelectLoc
             mapLib={maplibregl}
             {...viewState}
             onMove={(evt) => setViewState(evt.viewState)}
-            mapStyle={darkEnglishRasterStyle as any}
-            style={{ width: '100%', height: '100%' }}
+            mapStyle={osmRasterStyle as any}
+            style={{ width: '100%', height: '100%', filter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
             onClick={handleMapClick}
           >
             <NavigationControl position="bottom-right" />
