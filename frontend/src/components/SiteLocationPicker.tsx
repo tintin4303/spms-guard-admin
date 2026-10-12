@@ -1,7 +1,45 @@
 import { useState, useEffect, useRef } from 'react';
+import * as maplibregl from 'maplibre-gl';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapPin, X } from 'lucide-react';
+
+// Fix for Vite production worker path issue causing black maps
+// Bypass Rolldown's strict immutable import checks
+const maplibreglAny = maplibregl as any;
+maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
+
+const darkEnglishRasterStyle = {
+  version: 8,
+  sources: {
+    'esri-dark-base': {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+    },
+    'esri-dark-labels': {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256
+    }
+  },
+  layers: [
+    {
+      id: 'esri-base-layer',
+      type: 'raster',
+      source: 'esri-dark-base',
+      minzoom: 0,
+      maxzoom: 19
+    },
+    {
+      id: 'esri-label-layer',
+      type: 'raster',
+      source: 'esri-dark-labels',
+      minzoom: 0,
+      maxzoom: 19
+    }
+  ]
+};
 
 interface LocationPickerProps {
   initialLat?: number | null;
@@ -128,9 +166,10 @@ export default function SiteLocationPicker({ initialLat, initialLng, onSelectLoc
 
           <Map
             ref={mapRef}
+            mapLib={maplibregl}
             {...viewState}
             onMove={(evt) => setViewState(evt.viewState)}
-            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            mapStyle={darkEnglishRasterStyle as any}
             style={{ width: '100%', height: '100%' }}
             onClick={handleMapClick}
           >
