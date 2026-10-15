@@ -1,6 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
+import * as maplibregl from 'maplibre-gl';
 import Map, { Source, Layer, Marker, NavigationControl } from 'react-map-gl/maplibre';
 import { savePatrolPath, fetchPatrolPaths, updatePatrolPath, deletePatrolPath, fetchContracts } from '../api';
+
+// Fix for Vite production worker path issue causing black maps
+// Bypass Rolldown's strict immutable import checks
+const maplibreglAny = maplibregl as any;
+maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
+
+const osmRasterStyle = {
+  version: 8,
+  sources: {
+    'osm': {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap contributors'
+    }
+  },
+  layers: [
+    {
+      id: 'osm-layer',
+      type: 'raster',
+      source: 'osm',
+      minzoom: 0,
+      maxzoom: 19
+    }
+  ]
+};
 
 interface Pin {
   lat?: number;
@@ -440,10 +467,11 @@ export default function MapControl({ user }: { user?: any }) {
 
           <Map
             ref={mapRef}
+            mapLib={maplibregl}
             {...viewState}
             onMove={evt => setViewState(evt.viewState)}
-            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            style={{ width: '100%', height: '600px', minHeight: '600px', display: 'block' }}
+            mapStyle={osmRasterStyle as any}
+            style={{ width: '100%', height: '600px', minHeight: '600px', display: 'block', filter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
             interactiveLayerIds={[]}
             onClick={onMapClick}
             dragPan={true}

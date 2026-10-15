@@ -1,7 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
+import * as maplibregl from 'maplibre-gl';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapPin, X } from 'lucide-react';
+
+// Fix for Vite production worker path issue causing black maps
+// Bypass Rolldown's strict immutable import checks
+const maplibreglAny = maplibregl as any;
+maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
+
+const osmRasterStyle = {
+  version: 8,
+  sources: {
+    'osm': {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap contributors'
+    }
+  },
+  layers: [
+    {
+      id: 'osm-layer',
+      type: 'raster',
+      source: 'osm',
+      minzoom: 0,
+      maxzoom: 19
+    }
+  ]
+};
 
 interface LocationPickerProps {
   initialLat?: number | null;
@@ -128,10 +154,11 @@ export default function SiteLocationPicker({ initialLat, initialLng, onSelectLoc
 
           <Map
             ref={mapRef}
+            mapLib={maplibregl}
             {...viewState}
             onMove={(evt) => setViewState(evt.viewState)}
-            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            style={{ width: '100%', height: '100%' }}
+            mapStyle={osmRasterStyle as any}
+            style={{ width: '100%', height: '100%', filter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
             onClick={handleMapClick}
           >
             <NavigationControl position="bottom-right" />
