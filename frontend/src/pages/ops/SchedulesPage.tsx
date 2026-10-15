@@ -395,7 +395,61 @@ export default function SchedulesPage({ role }: { role?: string }) {
     siteName: string;
     rosterId: string;
     guardId: string;
+    source?: 'manual' | 'autoSchedule';
+    warningTitle?: string;
+    warningSubtitle?: string;
+    warningReason?: string;
+    previousGuardId?: string;
   } | null>(null);
+
+  const handleAutoScheduleGuardChange = (rec: any, newGuardId: string, currentGuardId: string) => {
+    if (!newGuardId) {
+      setSelectedGuardMap(prev => ({ ...prev, [rec.rosterId]: '' }));
+      return;
+    }
+
+    const sg = rec.allScoredGuards?.find((g: any) => String(g.guardId) === String(newGuardId));
+    const matchedGuardObj = guards.find((g: any) => String(g.id) === String(newGuardId)) || {
+      firstName: sg?.guardName?.split(' ')[0] || sg?.guardName || 'Guard',
+      lastName: sg?.guardName?.split(' ').slice(1).join(' ') || '',
+      guardId: sg?.guardCode || newGuardId,
+      shiftPreference: sg?.shiftPreference || 'Flexible'
+    };
+
+    const startHour = parseInt((rec.startTime || '08:00').split(':')[0], 10);
+    const targetShiftType: 'Day' | 'Night' = (startHour >= 6 && startHour < 18) ? 'Day' : 'Night';
+
+    // Check if guard has a warning, is preference mismatched, or is unsuggested
+    const isUnsuggestedOrWarning = Boolean(
+      sg?.hasWarning || 
+      sg?.isPreferenceMismatch || 
+      (sg && !sg.isEligible && !sg.isHardBlocked) || 
+      (matchedGuardObj.shiftPreference && matchedGuardObj.shiftPreference !== 'Flexible' && matchedGuardObj.shiftPreference !== targetShiftType)
+    );
+
+    if (isUnsuggestedOrWarning) {
+      const pref = matchedGuardObj.shiftPreference || sg?.shiftPreference || 'Flexible';
+      const reason = sg?.warningReason || (sg?.isPreferenceMismatch ? `Prefers ${pref} Shifts` : (sg?.disqualificationReason || 'Shift preference mismatch'));
+
+      setPreferenceMismatchConfirm({
+        guard: matchedGuardObj,
+        targetShiftType,
+        shiftLabel: rec.shiftLabel || rec.timing,
+        siteName: rec.siteName,
+        rosterId: rec.rosterId,
+        guardId: newGuardId,
+        source: 'autoSchedule',
+        warningTitle: 'Shift Preference Mismatch',
+        warningSubtitle: 'Operations Manager Override Confirmation',
+        warningReason: reason,
+        previousGuardId: currentGuardId
+      });
+      return;
+    }
+
+    setSelectedGuardMap(prev => ({ ...prev, [rec.rosterId]: newGuardId }));
+    setAcceptedRosterMap(prev => ({ ...prev, [rec.rosterId]: true }));
+  };
 
   const executeAssignGuard = async (rosterId: string, guardId: string) => {
     setIsSubmittingAssignGuard(true);
@@ -1595,13 +1649,23 @@ export default function SchedulesPage({ role }: { role?: string }) {
                             <div className="mt-2.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[13px] font-semibold text-slate-800">
-                                  {chosenGuardId && chosenGuardId !== topGuard?.guardId ? 'Manual Selection: ' : 'System Recommendation: '}
+                                  {chosenGuardId && chosenGuardId !== topGuard?.guardId ? 'Manual Override: ' : 'System Recommendation: '}
                                   <span className="text-[#1E3A5F] font-bold">{activeGuard.guardName}</span>
                                 </span>
                                 <span className="bg-slate-100 text-[#1E3A5F] text-[11px] font-bold px-2 py-0.5 rounded border border-slate-300">
                                   {activeGuard.matchScore}% Match Score
                                 </span>
                               </div>
+
+                              {/* Warning Badge if unsuggested / preference mismatch */}
+                              {(activeGuard.hasWarning || activeGuard.isPreferenceMismatch) && (
+                                <div className="mt-2 text-[12px] bg-amber-50 text-amber-800 border border-amber-200 rounded px-2.5 py-1.5 font-medium flex items-center gap-1.5">
+                                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                  <span>
+                                    <strong>Override Warning:</strong> {activeGuard.warningReason || `Guard prefers ${activeGuard.shiftPreference} shifts`}
+                                  </span>
+                                </div>
+                              )}
 
                               {/* Rationale Badges */}
                               <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
@@ -1625,39 +1689,88 @@ export default function SchedulesPage({ role }: { role?: string }) {
                         <label className="block text-[11px] font-semibold text-slate-500 mb-1">Assigned Guard (Override)</label>
                         <select
                           value={chosenGuardId}
-                          onChange={e => setSelectedGuardMap({ ...selectedGuardMap, [rec.rosterId]: e.target.value })}
+                          onChange={e => handleAutoScheduleGuardChange(rec, e.target.value, chosenGuardId)}
                           className="w-full border rounded px-2.5 py-1.5 text-[12px] bg-white border-gray-300 focus:outline-none focus:border-[#1E3A5F] font-medium"
                         >
                           <option value="">{topGuard ? 'Select Guard...' : 'No Eligible Guard Available'}</option>
                           {rec.allScoredGuards && rec.allScoredGuards.length > 0 ? (
-                            rec.allScoredGuards.map((sg: any, index: number) => {
-                              const isRecommended = topGuard && sg.guardId === topGuard.guardId;
-                              const pref = sg.shiftPreference || 'Flexible';
-                              const isIneligible = sg.isEligible === false;
+                            (() => {
+                              const recommended = rec.allScoredGuards.filter((sg: any) => !sg.isHardBlocked && sg.isEligible && !sg.hasWarning);
+                              const warnings = rec.allScoredGuards.filter((sg: any) => !sg.isHardBlocked && (sg.hasWarning || !sg.isEligible));
+                              const locked = rec.allScoredGuards.filter((sg: any) => sg.isHardBlocked);
+
                               return (
-                                <option 
-                                  key={sg.guardId} 
-                                  value={sg.guardId}
-                                  disabled={isIneligible}
-                                  className={isIneligible ? 'text-red-400 bg-gray-50' : 'text-slate-900'}
-                                >
-                                  {isIneligible 
-                                    ? `[INELIGIBLE] ${sg.guardName} (${pref}) - ${sg.disqualificationReason || 'Restricted'}`
-                                    : `#${index + 1} • ${sg.guardName} (${pref}) [${sg.matchScore}% Match]${isRecommended ? ' (Recommended)' : ''}`
-                                  }
-                                </option>
+                                <>
+                                  {recommended.length > 0 && (
+                                    <optgroup label="Recommended Candidates">
+                                      {recommended.map((sg: any, index: number) => {
+                                        const isRecommended = topGuard && sg.guardId === topGuard.guardId;
+                                        const pref = sg.shiftPreference || 'Flexible';
+                                        return (
+                                          <option key={sg.guardId} value={sg.guardId} className="text-slate-900">
+                                            #{index + 1} • {sg.guardName} ({pref}) [{sg.matchScore}% Match]{isRecommended ? ' (Recommended)' : ''}
+                                          </option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                  )}
+
+                                  {warnings.length > 0 && (
+                                    <optgroup label="Other Candidates (Shift Preference Mismatch / Warning)">
+                                      {warnings.map((sg: any) => {
+                                        const pref = sg.shiftPreference || 'Flexible';
+                                        const reason = sg.warningReason || sg.disqualificationReason || 'Shift Mismatch';
+                                        return (
+                                          <option key={sg.guardId} value={sg.guardId} className="text-amber-800 bg-amber-50/50">
+                                            ⚠️ {sg.guardName} ({pref}) - {reason}
+                                          </option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                  )}
+
+                                  {locked.length > 0 && (
+                                    <optgroup label="Legally Restricted (Max 1 Shift/Day)">
+                                      {locked.map((sg: any) => (
+                                        <option key={sg.guardId} value={sg.guardId} disabled className="text-gray-400 bg-gray-100">
+                                          🔒 {sg.guardName} - Already working another shift on this date
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                </>
                               );
-                            })
+                            })()
                           ) : (
-                            guards.map((g: any) => {
-                              const isRecommended = topGuard && g.id === topGuard.guardId;
-                              const pref = g.shiftPreference || 'Flexible';
+                            (() => {
+                              const startHour = parseInt((rec.startTime || '08:00').split(':')[0], 10);
+                              const targetShiftType: 'Day' | 'Night' = (startHour >= 6 && startHour < 18) ? 'Day' : 'Night';
+                              const matching = guards.filter((g: any) => !g.shiftPreference || g.shiftPreference === 'Flexible' || g.shiftPreference === targetShiftType);
+                              const nonMatching = guards.filter((g: any) => g.shiftPreference && g.shiftPreference !== 'Flexible' && g.shiftPreference !== targetShiftType);
                               return (
-                                <option key={g.id} value={g.id}>
-                                  {g.firstName} {g.lastName} ({pref}){isRecommended ? ' (Recommended)' : ''}
-                                </option>
+                                <>
+                                  <optgroup label={`Recommended (${targetShiftType} / Flexible)`}>
+                                    {matching.map((g: any) => {
+                                      const isRecommended = topGuard && g.id === topGuard.guardId;
+                                      return (
+                                        <option key={g.id} value={g.id}>
+                                          {g.firstName} {g.lastName} ({g.shiftPreference || 'Flexible'}){isRecommended ? ' (Recommended)' : ''}
+                                        </option>
+                                      );
+                                    })}
+                                  </optgroup>
+                                  {nonMatching.length > 0 && (
+                                    <optgroup label="Other Guards (Shift Preference Mismatch)">
+                                      {nonMatching.map((g: any) => (
+                                        <option key={g.id} value={g.id} className="text-amber-800">
+                                          ⚠️ {g.firstName} {g.lastName} • Prefers {g.shiftPreference}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                </>
                               );
-                            })
+                            })()
                           )}
                         </select>
                       </div>
@@ -1968,8 +2081,12 @@ export default function SchedulesPage({ role }: { role?: string }) {
                 <AlertTriangle className="w-5 h-5 text-amber-700" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-amber-950">Shift Preference Mismatch</h3>
-                <p className="text-[12px] text-amber-800">Operations Manager Override Confirmation</p>
+                <h3 className="text-base font-bold text-amber-950">
+                  {preferenceMismatchConfirm.warningTitle || 'Shift Preference Mismatch'}
+                </h3>
+                <p className="text-[12px] text-amber-800">
+                  {preferenceMismatchConfirm.warningSubtitle || 'Operations Manager Override Confirmation'}
+                </p>
               </div>
             </div>
 
@@ -1984,9 +2101,17 @@ export default function SchedulesPage({ role }: { role?: string }) {
                 <div className="flex justify-between items-center text-[13px]">
                   <span className="text-gray-600 font-medium">Guard Preference:</span>
                   <span className="font-semibold text-amber-900 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded text-[12px]">
-                    Prefers {preferenceMismatchConfirm.guard.shiftPreference} Shifts
+                    Prefers {preferenceMismatchConfirm.guard.shiftPreference || 'Flexible'} Shifts
                   </span>
                 </div>
+                {preferenceMismatchConfirm.warningReason && (
+                  <div className="flex justify-between items-start text-[13px] gap-2">
+                    <span className="text-gray-600 font-medium shrink-0">Warning Details:</span>
+                    <span className="text-amber-800 font-medium text-[12px] text-right">
+                      {preferenceMismatchConfirm.warningReason}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-[13px]">
                   <span className="text-gray-600 font-medium">Shift Assignment:</span>
                   <span className="font-semibold text-slate-800">
@@ -2013,7 +2138,21 @@ export default function SchedulesPage({ role }: { role?: string }) {
               <button
                 type="button"
                 disabled={isSubmittingAssignGuard}
-                onClick={() => executeAssignGuard(preferenceMismatchConfirm.rosterId, preferenceMismatchConfirm.guardId)}
+                onClick={() => {
+                  if (preferenceMismatchConfirm.source === 'autoSchedule') {
+                    setSelectedGuardMap(prev => ({
+                      ...prev,
+                      [preferenceMismatchConfirm.rosterId]: preferenceMismatchConfirm.guardId
+                    }));
+                    setAcceptedRosterMap(prev => ({
+                      ...prev,
+                      [preferenceMismatchConfirm.rosterId]: true
+                    }));
+                    setPreferenceMismatchConfirm(null);
+                  } else {
+                    executeAssignGuard(preferenceMismatchConfirm.rosterId, preferenceMismatchConfirm.guardId);
+                  }
+                }}
                 className="bg-amber-600 px-5 py-2 text-white text-[13px] font-semibold rounded-lg hover:bg-amber-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {isSubmittingAssignGuard ? (

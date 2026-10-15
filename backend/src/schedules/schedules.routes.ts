@@ -331,19 +331,25 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
         const rationale: string[] = [];
         let isEligible = true;
         let disqualificationReason = '';
+        let isHardBlocked = false;
+        let hasWarning = false;
+        let warningReason = '';
 
         // 1. Availability / Legal 1 Shift/Day Limit Check (HARD RESTRICTION)
         if (alreadyWorking) {
           isEligible = false;
+          isHardBlocked = true;
           disqualificationReason = 'Legally Restricted: Max 1 Shift/Day';
           rationale.push('Disqualified: Max 1 Shift/Day Reached');
         }
 
-        // 2. Site Gender Requirement Check (HARD RESTRICTION)
+        // 2. Site Gender Requirement Check (RESTRICTION / WARNING)
         const requiredGender = getSiteRequiredGender(r.site?.guardQualifications);
         if (requiredGender) {
           if (guardGender !== requiredGender) {
             isEligible = false;
+            hasWarning = true;
+            warningReason = `Site requires ${requiredGender} guard (Guard is ${guardGender})`;
             disqualificationReason = `Ineligible: Site strictly requires ${requiredGender} guard (Guard is ${guardGender})`;
             rationale.push(`Disqualified: Site requires ${requiredGender} guard`);
           } else {
@@ -352,20 +358,24 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           }
         }
 
-        // 3. Strict Shift Preference Match (HARD RESTRICTION FOR PREFERENCE CONFLICTS)
+        // 3. Strict Shift Preference Match (RECOMMENDATION RESTRICTION / OPS OVERRIDE WARNING)
         const pref = (g.shiftPreference || 'Flexible').toLowerCase();
         let isPrefMismatch = false;
 
         if (pref.includes('day') && isNightShift) {
           isEligible = false;
+          isPrefMismatch = true;
+          hasWarning = true;
+          warningReason = 'Guard prefers Day shifts (Night shift assignment)';
           disqualificationReason = 'Ineligible: Day Preference Guard on Night Shift';
           rationale.push('Disqualified: Day-Only Guard');
-          isPrefMismatch = true;
         } else if (pref.includes('night') && !isNightShift) {
           isEligible = false;
+          isPrefMismatch = true;
+          hasWarning = true;
+          warningReason = 'Guard prefers Night shifts (Day shift assignment)';
           disqualificationReason = 'Ineligible: Night Preference Guard on Day Shift';
           rationale.push('Disqualified: Night-Only Guard');
-          isPrefMismatch = true;
         } else if ((pref.includes('day') && !isNightShift) || (pref.includes('night') && isNightShift)) {
           score += 40;
           rationale.push(`Shift Preference Match (${isNightShift ? 'Night' : 'Day'})`);
@@ -374,7 +384,7 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           rationale.push('Flexible Availability');
         }
 
-        // 4. Rest Interval Protection (HARD RESTRICTION FOR CONSECUTIVE NIGHT/DAY SHIFTS)
+        // 4. Rest Interval Protection (RESTRICTION / WARNING FOR CONSECUTIVE NIGHT/DAY SHIFTS)
         if (r.date) {
           const prevDay = new Date(r.date);
           prevDay.setDate(prevDay.getDate() - 1);
@@ -382,6 +392,8 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           if (prevDateIso && guardDailyAssignments[`${gId}_${prevDateIso}`]) {
             if (!isNightShift && startHour < 12) {
               isEligible = false;
+              hasWarning = true;
+              warningReason = warningReason || 'Mandatory 12-Hour Rest Buffer Violation';
               disqualificationReason = 'Ineligible: Mandatory 12-Hour Rest Buffer Violation';
               rationale.push('Disqualified: Insufficient Rest Interval');
             } else {
@@ -422,6 +434,9 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
           gender: guardGender,
           shiftPreference: g.shiftPreference || 'Flexible',
           isPreferenceMismatch: isPrefMismatch,
+          isHardBlocked,
+          hasWarning,
+          warningReason,
           isEligible,
           disqualificationReason,
           matchScore: isEligible ? Math.max(10, Math.min(100, score)) : 0,
@@ -432,7 +447,13 @@ router.post('/auto-schedule-preview', async (req: Request, res: Response): Promi
       // Filter eligible guards only for system recommendation
       const eligibleGuards = scoredGuards.filter(sg => sg.isEligible);
       eligibleGuards.sort((a, b) => b.matchScore - a.matchScore);
-      scoredGuards.sort((a, b) => b.matchScore - a.matchScore);
+      scoredGuards.sort((a, b) => {
+        if (a.isHardBlocked && !b.isHardBlocked) return 1;
+        if (!a.isHardBlocked && b.isHardBlocked) return -1;
+        if (a.isEligible && !b.isEligible) return -1;
+        if (!a.isEligible && b.isEligible) return 1;
+        return b.matchScore - a.matchScore;
+      });
 
       const topGuard = eligibleGuards[0] || null;
       let isStaffShortage = !topGuard;
