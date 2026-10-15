@@ -4,9 +4,13 @@ import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
 import { MapPin, X } from 'lucide-react';
 
 // Fix for Vite production worker path issue causing black maps
-// Bypass Rolldown's strict immutable import checks
-const maplibreglAny = maplibregl as any;
-maplibreglAny.workerUrl = 'https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js';
+try {
+  if (typeof (maplibregl as any).setWorkerUrl === 'function') {
+    (maplibregl as any).setWorkerUrl('https://unpkg.com/maplibre-gl@6.4.0/dist/maplibre-gl-csp-worker.js');
+  }
+} catch {
+  // Ignore if workerUrl already set
+}
 
 const osmRasterStyle = {
   version: 8,
